@@ -28,12 +28,17 @@
        Portrait: the case takes the upper part, the caption sits under it. */
     /* phone: the case fills the width; it shrinks when it stands up at the
        end, to leave room for the closing page under it */
-    --u:calc(min(92vw, 60svh) / 740 * (1 - var(--stand) * .4));
+    /* --ubase: as wide as the screen allows, but never so big that the case
+       (about 840 units tall with its label and tag) plus the caption and dial
+       under it (about 330px) overflow the visible height */
+    --ubase:min(92vw / 740, (100vh - 330px) / 840);
+    --ubase:min(92vw / 740, (100dvh - 330px) / 840);
+    --u:calc(var(--ubase) * (1 - var(--stand) * .4));
     /* where the body starts, left of centre: centred while open, moved over
        when closed to make room for the pull handle */
     --shift:calc(-318 - (1 - var(--p)) * 27 + var(--stand) * 45);
     --world-left:50%;
-    --world-top:calc(36% - var(--p) * 7%);
+    --world-top:calc(60px + (300 + var(--stand) * 120) * var(--ubase));
     /* the camera rises as the case opens: low while closed so the volume
        reads, higher once open so both halves have room to be filled */
     --tilt:calc(52deg - var(--p) * 16deg + var(--stand) * 15deg);
@@ -52,11 +57,14 @@
   html,body{margin:0;background:var(--bg);color:var(--line);
     font-family:'Heebo','Rubik',system-ui,-apple-system,'Segoe UI',sans-serif;}
 
-  .rig{height:1200vh;position:relative;}
+  .rig{height:1200vh;position:relative;z-index:1;}
   /* sticky and overflow:hidden must not share an element (breaks in WebKit),
      so the clipping lives on .view. The graph paper is painted on the pinned
      stage, not on the scrolling page, so it stays still while you scroll. */
-  .stage{position:sticky;top:0;height:100vh;height:100svh;overflow:clip;
+  .stage{position:sticky;top:0;height:100vh;height:100dvh;overflow:clip;}
+  /* the graph paper: a fixed layer behind everything, so it fills the whole
+     screen whatever the browser bars do, and stays still while you scroll */
+  .paper{position:fixed;inset:0;z-index:0;pointer-events:none;
     background-image:
       linear-gradient(var(--grid) 1px, transparent 1px),
       linear-gradient(90deg, var(--grid) 1px, transparent 1px),
@@ -297,7 +305,10 @@
     /* one label at a time, on a chip under the case */
     .label{font-size:14px;}
     .label.mid{transform:translate(-50%,-50%);}
-    .captions.ending{min-height:52svh;}
+    /* the caption hangs under the case, not off the bottom of the screen */
+    .view{perspective-origin:50% calc(60px + 350 * var(--ubase));}
+    .captions{top:calc(60px + 840 * var(--ubase));bottom:auto;min-height:0;}
+    .captions.ending{top:calc(60px + 465 * var(--ubase));}
     .cap.end h2{font-size:2.3rem;}
     .tips{margin-bottom:.9em;}
     .tips li{padding-top:.4em;padding-bottom:.4em;font-size:.95rem;line-height:1.45;}
@@ -478,6 +489,8 @@
     </symbol>
   </defs>
 </svg>
+
+<div class="paper" aria-hidden="true"></div>
 
 <div class="rig">
   <div class="stage">
