@@ -1242,7 +1242,7 @@
     document.documentElement.style.setProperty('--stand', stand);
     world.classList.toggle('standing', stand > .02);
     world.classList.toggle('stood', stand > .9);
-    captionsBox.classList.toggle('ending', s === 8);
+    captionsBox.classList.toggle('ending', s === 8 && stand > .85);
 
     const state = {packed: new Set(), compact: t >= COMPACT_AT, atHotel: s >= 6};
     let load = 0;
@@ -1294,7 +1294,9 @@
     stamp.classList.toggle('on', load >= 100 && s >= 1 && s !== 5 && s !== 8);
     route.style.setProperty('--trip', clamp01(t / (SCENES - .5)));
 
-    for (const cap of caps) cap.classList.toggle('on', Number(cap.dataset.s) === s);
+    // the closing page only appears once the case is standing; while it shuts
+    // and stands up there is no caption, so nothing sits on top of the open case
+    for (const cap of caps) cap.classList.toggle('on', Number(cap.dataset.s) === s && (s !== 8 || stand > .85));
     // the dial stays in one place: under the longest caption
     gauge.parentElement.style.setProperty('--under', (Math.max(...caps.filter(cap => !cap.classList.contains('end')).map(cap => cap.offsetHeight)) + 18) + 'px');
   }
