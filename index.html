@@ -21,7 +21,7 @@
     --line:#1E3A6E;
     --grid:rgba(30,58,110,.07);
     --grid-major:rgba(30,58,110,.13);
-    --extra:#D4266E; /* second ink, for what did not need packing */
+    --extra:#C2185B; /* second ink, for what did not need packing (5.3:1 on the paper) */
     --stand:0; /* closing page: 0 lying → 1 standing on its wheels, set from JS */
     --p:0; /* lid: 0 closed → 1 open, set from JS */
     /* one drawing unit. The shell body is 600 x 400 units, each half 100 deep.
@@ -297,6 +297,8 @@
     font-size:1.05rem;transition:transform .15s ease, background-color .15s ease;}
   .wa:hover{transform:translateY(-2px);background:var(--extra);}
   .wa:focus-visible{outline:3px solid var(--extra);outline-offset:3px;}
+  /* for screen readers only */
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
 
   @media not all and (min-width:900px) and (min-aspect-ratio:5/4){
     /* the tag is drawn bigger and lies in front of the corner, to stay on screen */
@@ -321,7 +323,10 @@
   .hint.on{opacity:1;}
   .hint svg{width:26px;height:26px;stroke-width:2;animation:nudge 1.4s ease-in-out infinite;}
   @keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(7px)}}
-  @media (prefers-reduced-motion:reduce){.hint svg{animation:none;}}
+  @media (prefers-reduced-motion:reduce){
+    .hint svg,.view.slam{animation:none;}
+    .item,.stain,.stamp,.dial .needle,.lump{transition-timing-function:ease;transition-duration:.2s;}
+  }
 
   /* capacity gauge: how full the case is */
   /* it sits under the caption text and stays put from scene to scene;
@@ -344,7 +349,7 @@
     transition:transform .7s cubic-bezier(.3,1.4,.5,1), fill .6s ease, stroke .6s ease;}
   .dial .hub{fill:var(--paper);stroke-width:1.6;}
   .gauge .read{display:flex;gap:.6em;align-items:baseline;}
-  .gauge output{direction:ltr;color:var(--level);transition:color .6s ease;font-size:13px;}
+  .gauge output{direction:ltr;font-size:13px;}
 </style>
 </head>
 <body>
@@ -501,7 +506,7 @@
 
 <div class="paper" aria-hidden="true"></div>
 
-<div class="rig">
+<main class="rig">
   <div class="stage">
 
 
@@ -516,7 +521,7 @@
       <span>SEZ</span>
     </div>
 
-    <div class="view" id="view">
+    <div class="view" id="view" role="img" aria-label="שרטוט של מזוודה: היא נארזת, נדחסת, נסגרת, נפתחת במלון, ובסוף נעמדת">
       <div class="world" id="world">
 
         <div class="base" id="base">
@@ -811,11 +816,11 @@
       </div>
     </div>
 
-    <div class="labels" id="labels"><svg class="leaders" id="leaders"></svg></div>
+    <div class="labels" id="labels" aria-hidden="true"><svg class="leaders" id="leaders"></svg></div>
 
     <!-- Caption copy below is the 2026-10-03 draft, not yet approved. -->
     <div class="captions" id="captions">
-      <div class="gauge" id="gauge" aria-live="off">
+      <div class="gauge" id="gauge" aria-hidden="true">
         <!-- a dial: green on the empty side, red on the full side -->
         <svg class="dial" viewBox="0 0 120 68" aria-hidden="true">
           <defs>
@@ -839,15 +844,15 @@
         <p>התשובה נמצאת במזוודה אחת, בדרך לחופי סיישל.</p>
       </div>
       <div class="cap" data-s="1">
-        <span class="tag">CONTEXT WINDOW</span>
+        <span class="tag" lang="en">CONTEXT WINDOW</span>
         <p>אורזים לשבוע בחופי סיישל. המזוודה ריקה, ונראה שיש המון מקום, אבל הגודל קבוע. <b>זה ה-Context Window:</b> כמות המידע ש-AI מסוגל להחזיק בראש בבת אחת.</p>
       </div>
       <div class="cap" data-s="2">
-        <span class="tag">CONTEXT ENGINEERING</span>
+        <span class="tag" lang="en">CONTEXT ENGINEERING</span>
         <p>תרופות, כן. <span class="x">חמישה זוגות נעליים ומעיל לחוף</span>, פחות. כל דבר שנכנס תופס מקום של משהו אחר. <b>זה ה-Context Engineering:</b> לבחור מה נכנס ומה נשאר בבית.</p>
       </div>
       <div class="cap" data-s="3">
-        <span class="tag">COMPACTION</span>
+        <span class="tag" lang="en">COMPACTION</span>
         <p>לא נסגר, אז דוחסים: בגדים ונעליים לשקית ואקום. <b>זה ה-Compaction:</b> לכווץ את מה שבפנים כדי לפנות מקום. נשאר גוש אחד: יודעים שיש שם בגדים, לא זוכרים אילו.</p>
       </div>
       <div class="cap" data-s="4">
@@ -870,12 +875,12 @@
           <li>שיחה ארוכה? חזרו על הפרטים החשובים, לפני שהם נמעכים.</li>
         </ol>
         <p class="ask">רוצים להבין איך זה נוגע לעסק שלכם?</p>
-        <a class="wa" href="https://wa.me/972526328774" target="_blank" rel="noopener">דברו איתנו בוואטסאפ</a>
+        <a class="wa" href="https://wa.me/972526328774" target="_blank" rel="noopener">דברו איתנו בוואטסאפ<span class="sr"> (נפתח בחלון חדש)</span></a>
       </div>
     </div>
 
   </div>
-</div>
+</main>
 
 <script>
   const base = document.getElementById('base');
@@ -1331,6 +1336,11 @@
     for (const cap of caps) cap.classList.toggle('on', Number(cap.dataset.s) === s && (s !== 8 || stand > .85));
     // the dial stays in one place: under the longest caption
     gauge.parentElement.style.setProperty('--under', (Math.max(...caps.filter(cap => !cap.classList.contains('end')).map(cap => cap.offsetHeight)) + 18) + 'px');
+  }
+  // The closing page's link is in the page from the start. When the keyboard
+  // reaches it, scroll to the end so it is on screen.
+  for (const link of document.querySelectorAll('.cap.end a')) {
+    link.addEventListener('focus', () => window.scrollTo(0, document.documentElement.scrollHeight));
   }
   window.addEventListener('scroll', update, {passive:true});
   window.addEventListener('resize', update);
