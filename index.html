@@ -307,6 +307,10 @@
   .wa{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:.6em 1.5em;
     background:var(--line);color:var(--bg);border-radius:999px;text-decoration:none;font-weight:700;
     font-size:1.05rem;transition:transform .15s ease, background-color .15s ease;}
+  .again{display:block;margin-top:.7em;padding:6px 2px;min-height:32px;appearance:none;background:none;border:0;
+    font:inherit;font-weight:500;color:inherit;text-decoration:underline;text-underline-offset:4px;cursor:pointer;}
+  .again:hover{color:var(--extra);}
+  .again:focus-visible{outline:3px solid var(--extra);outline-offset:2px;}
   .wa:hover{transform:translateY(-2px);background:var(--extra);}
   .wa:focus-visible{outline:3px solid var(--extra);outline-offset:3px;}
   /* for screen readers only */
@@ -909,6 +913,7 @@
         </ol>
         <p class="ask">רוצים להבין איך זה נוגע לעסק שלכם?</p>
         <a class="wa" href="https://wa.me/972526328774" target="_blank" rel="noopener">דברו איתנו בוואטסאפ<span class="sr"> (נפתח בחלון חדש)</span></a>
+        <button type="button" class="again" id="again">להתחיל מהתחלה</button>
       </div>
     </div>
 
@@ -1418,9 +1423,14 @@
   }
   // The closing page's link is in the page from the start. When the keyboard
   // reaches it, scroll to the end so it is on screen.
-  for (const link of document.querySelectorAll('.cap.end a')) {
+  for (const link of document.querySelectorAll('.cap.end a, .cap.end button')) {
     link.addEventListener('focus', () => window.scrollTo(0, document.documentElement.scrollHeight));
   }
+  // start over: rewind to the top (at once, for people who asked for less motion)
+  document.getElementById('again').addEventListener('click', () => {
+    const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({top: 0, behavior: calm ? 'auto' : 'smooth'});
+  });
   window.addEventListener('scroll', update, {passive:true});
   window.addEventListener('resize', update);
   update();
