@@ -1,0 +1,1294 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>למה AI שוכח? | Boost Me</title>
+<meta name="description" content="למה AI שוכח דברים באמצע שיחה? Context Window, Context Engineering ו-Compaction, מוסברים דרך מזוודה אחת.">
+<meta property="og:title" content="למה AI שוכח?">
+<meta property="og:description" content="Context Window, Context Engineering ו-Compaction, מוסברים דרך מזוודה אחת. אתר הסבר של Boost Me.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#F6F3EA">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@700&family=Heebo:wght@400;500;700;800&display=swap" onload="this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@700&family=Heebo:wght@400;500;700;800&display=swap"></noscript>
+<style>
+  /* Approved opening-scene palette (2026-09-17): cream paper, cobalt ink. */
+  :root{
+    --bg:#F6F3EA;
+    --paper:#FAF8F1;
+    --line:#1E3A6E;
+    --grid:rgba(30,58,110,.07);
+    --grid-major:rgba(30,58,110,.13);
+    --extra:#D4266E; /* second ink, for what did not need packing */
+    --stand:0; /* closing page: 0 lying → 1 standing on its wheels, set from JS */
+    --p:0; /* lid: 0 closed → 1 open, set from JS */
+    /* one drawing unit. The shell body is 600 x 400 units, each half 100 deep.
+       Portrait: the case takes the upper part, the caption sits under it. */
+    /* phone: the case fills the width; it shrinks when it stands up at the
+       end, to leave room for the closing page under it */
+    --u:calc(min(92vw, 60svh) / 740 * (1 - var(--stand) * .4));
+    /* where the body starts, left of centre: centred while open, moved over
+       when closed to make room for the pull handle */
+    --shift:calc(-318 - (1 - var(--p)) * 27 + var(--stand) * 45);
+    --world-left:50%;
+    --world-top:calc(36% - var(--p) * 7%);
+    /* the camera rises as the case opens: low while closed so the volume
+       reads, higher once open so both halves have room to be filled */
+    --tilt:calc(52deg - var(--p) * 16deg + var(--stand) * 15deg);
+  }
+  /* wide screens: case on the left, caption in a column on the right */
+  @media (min-width:900px) and (min-aspect-ratio:5/4){
+    :root{
+      --u:calc(min(48vw, 73svh * 800 / 700) / 800);
+      --shift:-345;
+      --world-left:37%;
+      --world-top:calc(61% - var(--p) * 9% + var(--stand) * 19%);
+    }
+  }
+  *{box-sizing:border-box;}
+  html{overflow-x:clip;}
+  html,body{margin:0;background:var(--bg);color:var(--line);
+    font-family:'Heebo','Rubik',system-ui,-apple-system,'Segoe UI',sans-serif;}
+
+  .rig{height:1200vh;position:relative;}
+  /* sticky and overflow:hidden must not share an element (breaks in WebKit),
+     so the clipping lives on .view. The graph paper is painted on the pinned
+     stage, not on the scrolling page, so it stays still while you scroll. */
+  .stage{position:sticky;top:0;height:100vh;height:100svh;overflow:clip;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+      linear-gradient(var(--grid-major) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
+    background-size:16px 16px, 16px 16px, 80px 80px, 80px 80px;}
+  .view{position:absolute;inset:0;overflow:hidden;
+    perspective:calc(var(--u) * 2600);perspective-origin:50% 45%;}
+
+  /* The ground plane, seen from the front and above. Its top edge is the
+     hinge line: the base lies in front of it, the open lid lands behind it.
+     While closed, the case slides back so it sits centered. */
+  .world{position:absolute;left:var(--world-left);top:var(--world-top);direction:ltr;
+    width:calc(var(--u) * 600);height:calc(var(--u) * 400);
+    margin-left:calc(var(--u) * var(--shift));
+    transform-style:preserve-3d;transform-origin:50% 0;
+    /* Standing up: the case tips onto its wheel end (rotateY about the wheel
+       line), turns its ribbed face to the viewer (rotateZ about the middle
+       of its new footprint), and slides to the middle of the drawing. */
+    transform:rotateX(var(--tilt)) translateY(calc((1 - var(--p)) * -200 * var(--u)))
+      translateX(calc(var(--stand) * 400 * var(--u)))
+      translate(calc(-400 * var(--u)), calc(200 * var(--u))) rotateZ(calc(var(--stand) * -90deg)) translate(calc(400 * var(--u)), calc(-200 * var(--u)))
+      translateX(calc(-300 * var(--u))) rotateY(calc(var(--stand) * -90deg)) translateX(calc(300 * var(--u)));}
+  .world *{position:absolute;}
+  .base,.lid{inset:0;transform-style:preserve-3d;}
+
+  /* The lid hinges on the far rim of the base and lifts its free edge up
+     toward the viewer, then lays back flat behind the base, inside showing. */
+  .lid{transform-origin:50% 0 0;
+    transform:translateZ(calc(var(--u) * 100)) rotateX(calc(var(--p) * 180deg));}
+
+  /* a drawn face: an SVG plane covering the body plus its overhang */
+  .face{left:calc(var(--u) * -50);top:calc(var(--u) * -20);
+    width:calc(var(--u) * 800);height:calc(var(--u) * 440);overflow:visible;
+    transform:translateZ(calc(var(--u) * var(--z, 0)));}
+  .lid .shell{backface-visibility:hidden;-webkit-backface-visibility:hidden;}
+  .lid .inside{backface-visibility:hidden;-webkit-backface-visibility:hidden;
+    transform:translateZ(calc(var(--u) * var(--z))) rotateX(180deg);}
+
+  /* the pull handle is pushed home while the case is open (it slides under
+     the floor) and comes out when the case is closed */
+  .base .tele{transform:translateZ(calc(var(--u) * -1)) translateX(calc(var(--p) * -136 * var(--u)));}
+
+  /* Packed items have real volume: each is a group holding a stack of plain
+     slabs (the body) with its drawing on top. The group waits above the
+     case and drops into place when its moment in the script arrives. The
+     fade is on the parts, not the group, because opacity on a 3D group
+     would flatten it. */
+  .item,.lump,.spin{inset:0;transform-style:preserve-3d;pointer-events:none;}
+  /* things land with a small bounce */
+  .item{transition:transform .65s cubic-bezier(.3,1.5,.5,1);}
+  .item.extra{color:var(--extra);}
+  .item .slab,.item .top{opacity:0;transition:opacity .35s ease;}
+  .item.in .slab,.item.in .top{opacity:1;}
+  .base .item{transform:translateZ(calc(var(--u) * 240));}
+  .base .item.in{transform:translateZ(0);}
+  /* lid items are built upside down from the lid floor, so they end up
+     behind the mesh pocket once the lid lies open */
+  .lid .item{transform:translateZ(calc(var(--u) * -150)) rotateX(180deg);}
+  .lid .item.in{transform:translateZ(calc(var(--u) * 96)) rotateX(180deg);}
+  /* an item thrown in at an angle turns about the middle of its footprint */
+  .spin{transform-origin:calc(var(--u) * var(--ox)) calc(var(--u) * var(--oy));transform:rotate(var(--rot));}
+  .slab{left:calc(var(--u) * var(--x));top:calc(var(--u) * var(--y));
+    width:calc(var(--u) * var(--w));height:calc(var(--u) * var(--h));
+    border-radius:calc(var(--u) * var(--r));background:var(--paper);
+    box-shadow:0 0 0 calc(var(--u) * 1) color-mix(in srgb, currentColor 45%, transparent);
+    transform:translateZ(calc(var(--u) * var(--z)));}
+
+  /* The tube is found squeezed at the destination. */
+  .item.in .squeezed{opacity:0;}
+  .ruined .item.in .squeezed{opacity:1;}
+  .ruined .item.in .full{opacity:0;}
+
+  /* Compaction: shirts, trousers and every pair of shoes go into one vacuum
+     bag. The bag starts as tall as the heap it replaces and deflates;
+     whatever was not merged settles down onto it. */
+  .compact .base .merge.in .slab,.compact .base .merge.in .top{opacity:0;}
+  .compact .base .item.in{transform:translateZ(calc(var(--u) * var(--settle, 0)));}
+  .lump{transform:scale3d(1,1,3.2);transition:transform 1s cubic-bezier(.3,.7,.3,1) .1s;}
+  .compact .lump{transform:none;}
+  .lump .slab,.lump .top{opacity:0;transition:opacity .4s ease;}
+  .compact .lump .slab,.compact .lump .top{opacity:1;}
+
+  /* the luggage tag lies on the ground plane, just outside the case */
+  .tagplane{left:calc(var(--u) * 560);top:calc(var(--u) * 230);
+    width:calc(var(--u) * 200);height:calc(var(--u) * 280);overflow:visible;
+    pointer-events:none;transform:translateZ(calc(var(--u) * 1));transition:opacity .3s ease;}
+  .standing .tagplane{opacity:0;}
+  /* its twin on the standing case appears once the case is upright */
+  .tagup{opacity:0;pointer-events:none;transition:opacity .4s ease;}
+  .stood .tagup{opacity:1;}
+
+  /* the leaked sunscreen: hidden until the case is opened at the destination,
+     then it shows over everything in both halves */
+  .stain{opacity:0;pointer-events:none;
+    transition:opacity .3s ease, transform .7s cubic-bezier(.3,1.6,.5,1);}
+  /* it splats outward as the lid comes up */
+  .splat .stain{opacity:1;}
+  .base .stain{transform:translateZ(calc(var(--u) * 114)) scale(.25);}
+  .splat .base .stain{transform:translateZ(calc(var(--u) * 114)) scale(1);}
+  .lid .stain{transform:translateZ(calc(var(--u) * 52)) rotateX(180deg) scale(.25);}
+  .splat .lid .stain{transform:translateZ(calc(var(--u) * 52)) rotateX(180deg) scale(1);}
+  /* the mesh pocket lies flat on the lid floor while empty and bulges up
+     over the items once something is packed behind it */
+  .lid .pocket{transition:transform .6s ease;}
+  .packed .lid .pocket{transform:translateZ(calc(var(--u) * 48)) rotateX(180deg);}
+  .cream{fill:var(--paper);fill-opacity:.9;}
+
+  /* leader labels. Each has an invisible anchor point inside the 3D world;
+     the label itself sits flat in a column beside the case, with a line
+     drawn to the spot where its anchor lands on screen. */
+  .anchor{left:calc(var(--u) * var(--x));top:calc(var(--u) * var(--y));width:1px;height:1px;
+    transform:translateZ(calc(var(--u) * var(--z)));}
+  .labels{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;direction:ltr;}
+  .leaders{position:absolute;inset:0;width:100%;height:100%;}
+  .leaders line{stroke-width:1;opacity:0;transition:opacity .35s ease;}
+  .leaders circle{fill:currentColor;stroke:none;opacity:0;transition:opacity .35s ease;}
+  .leaders line.on{opacity:.75;}
+  .leaders circle.on{opacity:1;}
+  .label{position:absolute;opacity:0;transition:opacity .35s ease;transform:translateY(-50%);
+    direction:rtl;white-space:nowrap;font-weight:500;
+    font-size:clamp(10px, calc(var(--u) * 19), 15px);line-height:1.2;
+    padding:.2em .6em;background:var(--paper);border:1px solid var(--line);border-radius:3px;}
+  .label.left{transform:translate(-100%,-50%);}
+  .label.on{opacity:1;}
+
+  /* walls: the shell outline stacked up through the depth. Each slice is an
+     opaque paper band with an ink edge, so the stack reads as a solid wall
+     with contour lines, and the rounded corners come for free. */
+  .ring{left:0;top:0;width:calc(var(--u) * 600);height:calc(var(--u) * 400);
+    border-radius:calc(var(--u) * 48);border:calc(var(--u) * 30) solid var(--paper);
+    box-shadow:0 0 0 calc(var(--u) * 1.1) rgba(30,58,110,.42),
+               inset 0 0 0 calc(var(--u) * .8) rgba(30,58,110,.2);
+    transform:translateZ(calc(var(--u) * var(--z)));}
+
+  /* flat wall planes along the straight runs, outer and inner. They keep the
+     walls solid at the angles where the slices are seen edge-on; the slices
+     still carry the rounded corners. */
+  .wall{transform-origin:0 0;background-color:var(--paper);
+    left:calc(var(--u) * var(--x));top:calc(var(--u) * var(--y));}
+  .wall.wx{width:calc(var(--u) * 504);height:calc(var(--u) * 100);transform:rotateX(90deg);
+    background-image:repeating-linear-gradient(to bottom, transparent 0,
+      transparent calc(var(--u) * 9), rgba(30,58,110,.3) calc(var(--u) * 9), rgba(30,58,110,.3) calc(var(--u) * 10));}
+  .wall.wy{width:calc(var(--u) * 100);height:calc(var(--u) * 304);transform:rotateY(-90deg);
+    background-image:repeating-linear-gradient(to right, transparent 0,
+      transparent calc(var(--u) * 9), rgba(30,58,110,.3) calc(var(--u) * 9), rgba(30,58,110,.3) calc(var(--u) * 10));}
+
+  /* wheels with real volume, on the wheel end of the case. Each is a tire
+     (discs stacked along the axle, capped by a drawn hub at both ends) held
+     between two fork plates that run back to the shell. */
+  .wheel{left:calc(var(--u) * -25);top:calc(var(--u) * var(--y));width:0;height:0;
+    transform-style:preserve-3d;transform:translateZ(calc(var(--u) * 50));}
+  .tire,.hub{left:calc(var(--u) * -17);top:calc(var(--u) * -17);
+    width:calc(var(--u) * 34);height:calc(var(--u) * 34);
+    transform:translateY(calc(var(--u) * var(--d))) rotateX(-90deg);}
+  .tire{border-radius:50%;background:var(--paper);
+    box-shadow:0 0 0 calc(var(--u) * 1.2) rgba(30,58,110,.55);}
+  .hub,.fork{overflow:visible;}
+  .fork{left:calc(var(--u) * -21);top:calc(var(--u) * -20);
+    width:calc(var(--u) * 52);height:calc(var(--u) * 40);
+    transform:translateY(calc(var(--u) * var(--d))) rotateX(-90deg);}
+
+  /* Line weights. Everything is ink (currentColor); fill is paper or none. */
+  svg{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;}
+  .o{stroke-width:3.2;}
+  .m{stroke-width:1.9;}
+  .t{stroke-width:1.1;opacity:.62;}
+  .h{stroke-width:.75;opacity:.42;}
+  .p{fill:var(--paper);}
+  .teeth{stroke-width:5;stroke-dasharray:1.6 3.4;stroke-linecap:butt;opacity:.38;}
+  .dash{stroke-dasharray:9 6;}
+  .tx{fill:currentColor;stroke:none;font:700 15px 'Heebo',system-ui,sans-serif;text-anchor:middle;}
+
+  /* caption: one card per scene, cross-faded */
+  .captions{position:absolute;z-index:3;left:16px;right:16px;bottom:max(4svh, env(safe-area-inset-bottom,0px) + 12px);
+    margin:0 auto;max-width:560px;min-height:36svh;}
+  @media (min-width:900px) and (min-aspect-ratio:5/4){
+    .captions{left:auto;right:5vw;bottom:auto;top:50%;transform:translateY(-50%);
+      width:min(30vw,400px);min-height:260px;margin:0;}
+  }
+  .cap{position:absolute;top:0;left:0;right:0;opacity:0;transition:opacity .5s ease;pointer-events:none;}
+  .cap.on{opacity:1;}
+  .tag{display:inline-block;margin:0 0 .7em;padding:.25em .7em;border:1.5px solid var(--line);
+    font:600 12px 'JetBrains Mono',ui-monospace,Consolas,monospace;letter-spacing:.14em;direction:ltr;}
+  .cap h1{margin:0 0 .15em;font-family:'Amatic SC','Heebo',system-ui,sans-serif;font-weight:700;
+    font-size:clamp(3.4rem,10vw,6rem);line-height:.95;letter-spacing:.01em;}
+  /* the second ink: what did not need packing */
+  .cap .x{color:var(--extra);font-weight:500;}
+  .cap p{margin:0;font-size:clamp(1rem,2.4vw,1.2rem);line-height:1.6;text-wrap:pretty;}
+  .cap b{font-weight:700;}
+
+  .leaders .extra{color:var(--extra);}
+  .label.extra{color:var(--extra);border-color:var(--extra);}
+
+  @keyframes slam{0%{transform:translate(0,0)}15%{transform:translate(-7px,5px)}30%{transform:translate(6px,-4px)}
+    50%{transform:translate(-4px,3px)}70%{transform:translate(2px,-2px)}100%{transform:translate(0,0)}}
+  .view.slam{animation:slam .45s ease-out;}
+
+  /* progress, drawn as the flight out: a plane on a dashed route */
+  .route{position:absolute;z-index:3;top:max(14px, env(safe-area-inset-top,0px) + 6px);left:16px;right:16px;
+    margin:0 auto;max-width:440px;display:flex;align-items:center;gap:10px;direction:ltr;
+    font:600 12px 'JetBrains Mono',ui-monospace,Consolas,monospace;letter-spacing:.12em;}
+  .route .line{position:relative;flex:1;height:22px;}
+  .route .line::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:1.5px dashed currentColor;opacity:.5;}
+  .route .plane{position:absolute;top:50%;left:calc(var(--trip, 0) * 100%);width:22px;height:22px;
+    transform:translate(-50%,-50%);overflow:visible;transition:left .3s linear;}
+  .route .plane path{fill:var(--bg);stroke-width:1.6;}
+
+  /* overweight: stamped beside the dial when the case is full */
+  .stamp{position:absolute;z-index:3;top:calc(var(--under, 0px) + 14px);left:0;padding:.25em .7em .2em;
+    border:3px double var(--bad, #C8402F);border-radius:6px;color:#C8402F;
+    font-family:'Amatic SC','Heebo',system-ui,sans-serif;font-weight:700;font-size:clamp(1.5rem,3.4vw,2.1rem);line-height:1;
+    transform-origin:0 50%;
+    opacity:0;transform:rotate(-9deg) scale(1.9);transition:opacity .12s ease, transform .28s cubic-bezier(.3,1.7,.5,1);}
+  .stamp.on{opacity:.9;transform:rotate(-9deg) scale(1);}
+
+  /* closing page */
+  .cap.end.on{pointer-events:auto;}
+  .cap.end h2{margin:0 0 .35em;font-family:'Amatic SC','Heebo',system-ui,sans-serif;font-weight:700;
+    font-size:clamp(2.4rem,6.5vw,3.6rem);line-height:1;}
+  .tips{list-style:none;margin:0 0 1.4em;padding:0;counter-reset:tip;}
+  .tips li{position:relative;padding:.55em 2.4em .55em 0;border-bottom:1px dashed color-mix(in srgb, currentColor 40%, transparent);
+    font-size:clamp(1rem,2.2vw,1.1rem);line-height:1.5;counter-increment:tip;}
+  .tips li::before{content:counter(tip);position:absolute;right:0;top:.5em;width:1.7em;height:1.7em;
+    border:1.5px solid currentColor;border-radius:50%;display:grid;place-items:center;
+    font:600 .8em 'JetBrains Mono',ui-monospace,Consolas,monospace;}
+  .cap.end .ask{margin:0 0 .7em;font-weight:500;}
+  .wa{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:.6em 1.5em;
+    background:var(--line);color:var(--bg);border-radius:999px;text-decoration:none;font-weight:700;
+    font-size:1.05rem;transition:transform .15s ease, background-color .15s ease;}
+  .wa:hover{transform:translateY(-2px);background:var(--extra);}
+  .wa:focus-visible{outline:3px solid var(--extra);outline-offset:3px;}
+
+  @media not all and (min-width:900px) and (min-aspect-ratio:5/4){
+    /* the tag is drawn bigger and lies in front of the corner, to stay on screen */
+    .tagplane{transform-origin:51% 36%;
+      transform:translateZ(calc(var(--u) * 1)) translate(calc(var(--u) * -150), calc(var(--u) * 150)) scale(1.5);}
+    /* one label at a time, on a chip under the case */
+    .label{font-size:14px;}
+    .label.mid{transform:translate(-50%,-50%);}
+    .captions.ending{min-height:52svh;}
+    .cap.end h2{font-size:2.3rem;}
+    .tips{margin-bottom:.9em;}
+    .tips li{padding-top:.4em;padding-bottom:.4em;font-size:.95rem;line-height:1.45;}
+  }
+
+  /* capacity gauge: how full the case is */
+  /* it sits under the caption text and stays put from scene to scene;
+     --under is set from JS to the height of the longest caption */
+  .gauge{position:absolute;z-index:3;top:var(--under, 0px);right:0;
+    width:max-content;display:flex;flex-direction:column;align-items:center;gap:2px;
+    font:600 12px 'JetBrains Mono',ui-monospace,Consolas,monospace;letter-spacing:.08em;
+    opacity:0;transition:opacity .4s ease, top .45s ease;
+    /* --lvl is how full the case is, 0..1, set from JS. The needle and the
+       reading take the colour of the point on the dial they have reached. */
+    --lvl:0;--ok:#2F8F5B;--warn:#D9A21B;--bad:#C8402F;
+    --level:color-mix(in oklch, var(--ok), var(--bad) calc(var(--lvl) * 100%));}
+  .gauge.on{opacity:1;}
+  .dial{width:clamp(112px, 12vw, 170px);height:auto;display:block;overflow:visible;}
+  .dial .track{stroke:url(#dial-ink);stroke-width:9;stroke-linecap:butt;}
+  .dial .rim{stroke-width:1.2;}
+  .dial .tick{stroke-width:1.2;opacity:.7;}
+  .dial .needle{fill:var(--level);stroke:var(--level);stroke-width:1;
+    transform-origin:60px 62px;transform:rotate(calc(var(--lvl) * 180deg - 90deg));
+    transition:transform .7s cubic-bezier(.3,1.4,.5,1), fill .6s ease, stroke .6s ease;}
+  .dial .hub{fill:var(--paper);stroke-width:1.6;}
+  .gauge .read{display:flex;gap:.6em;align-items:baseline;}
+  .gauge output{direction:ltr;color:var(--level);transition:color .6s ease;font-size:13px;}
+</style>
+</head>
+<body>
+
+<!-- Shared drawing parts. The shell faces are drawn standing in one box (body
+     at 0..400 x 0..600) and laid on their side with rotate(90). -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- pen wobble: makes ruler-straight vectors read as drawn by hand -->
+    <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency=".032" numOctaves="2" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4"/>
+    </filter>
+
+    <pattern id="mesh" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <path d="M0 0V9M0 0H9" stroke-width=".8" opacity=".6"/>
+    </pattern>
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(38)">
+      <path d="M0 0V6" stroke-width=".8" opacity=".3"/>
+    </pattern>
+    <pattern id="hatch2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-52)">
+      <path d="M0 0V5" stroke-width=".7" opacity=".28"/>
+    </pattern>
+
+    <clipPath id="lining-clip"><rect x="30" y="30" width="340" height="540" rx="18"/></clipPath>
+    <clipPath id="shell-clip"><rect x="0" y="0" width="400" height="600" rx="48"/></clipPath>
+
+    <!-- One pair of shoes, to scale (250 x 162), in two levels: the low
+         front of each shoe with its toe cap and laces, and the raised
+         collar round the opening at the heel end. -->
+    <g id="pair-low">
+      <rect class="m p" x="0" y="2" width="250" height="76" rx="38"/>
+      <path class="t" d="M46 9C33 26 33 54 46 71"/>
+      <path class="t" d="M62 24H124M62 56H124"/>
+      <path class="h" d="M66 24L84 56M84 24L66 56M88 24L106 56M106 24L88 56M110 24L124 50"/>
+      <rect class="m p" x="0" y="84" width="250" height="76" rx="38"/>
+      <path class="t" d="M46 91C33 108 33 136 46 153"/>
+      <path class="t" d="M62 106H124M62 138H124"/>
+      <path class="h" d="M66 106L84 138M84 106L66 138M88 106L106 138M106 106L88 138M110 106L124 132"/>
+    </g>
+    <g id="pair-high">
+      <rect class="m p" x="122" y="13" width="120" height="54" rx="27"/>
+      <ellipse cx="184" cy="40" rx="40" ry="17" fill="url(#hatch)" class="m"/>
+      <path class="t" d="M236 31V49"/>
+      <rect class="m p" x="122" y="95" width="120" height="54" rx="27"/>
+      <ellipse cx="184" cy="122" rx="40" ry="17" fill="url(#hatch)" class="m"/>
+      <path class="t" d="M236 113V131"/>
+    </g>
+
+    <!-- wheel end cap, seen along the axle -->
+    <symbol id="f-hub" viewBox="-17 -17 34 34" overflow="visible">
+      <circle class="o p" cx="0" cy="0" r="16.5"/>
+      <circle class="t" cx="0" cy="0" r="12"/>
+      <circle class="m p" cx="0" cy="0" r="6"/>
+    </symbol>
+
+    <!-- fork plate, side-on: wide where it meets the shell, narrowing to the axle -->
+    <symbol id="f-fork" viewBox="-46 -20 52 40" overflow="visible">
+      <path class="m p" d="M4 -15V15L-25 7A7 7 0 0 1 -25 -7Z"/>
+      <circle class="t" cx="-25" cy="0" r="3"/>
+    </symbol>
+
+    <!-- telescoping pull handle: belongs to the base, not the lid -->
+    <symbol id="f-tele" viewBox="-20 -150 440 800">
+      <g filter="url(#rough)">
+        <rect class="m p" x="150" y="-108" width="13" height="126"/>
+        <rect class="m p" x="237" y="-108" width="13" height="126"/>
+        <path class="h" d="M156 -100V10M243 -100V10"/>
+        <rect class="o p" x="138" y="-138" width="124" height="34" rx="13"/>
+        <path class="t" d="M152 -121H248"/>
+      </g>
+    </symbol>
+
+    <!-- the rim where the two halves meet: zipper band -->
+    <symbol id="f-rim" viewBox="-20 -150 440 800">
+      <g filter="url(#rough)">
+        <path class="o p" fill-rule="evenodd" d="M48 0H352A48 48 0 0 1 400 48V552A48 48 0 0 1 352 600H48A48 48 0 0 1 0 552V48A48 48 0 0 1 48 0ZM48 30H352A18 18 0 0 1 370 48V552A18 18 0 0 1 352 570H48A18 18 0 0 1 30 552V48A18 18 0 0 1 48 30Z"/>
+        <rect class="teeth" x="15" y="15" width="370" height="570" rx="33"/>
+        <rect class="t" x="7" y="7" width="386" height="586" rx="41"/>
+        <rect class="t" x="23" y="23" width="354" height="554" rx="25"/>
+      </g>
+    </symbol>
+
+    <!-- outside of the lid (what you see when closed) -->
+    <symbol id="f-shell" viewBox="-20 -150 440 800">
+      <g filter="url(#rough)">
+        <rect class="o p" x="0" y="0" width="400" height="600" rx="48"/>
+        <rect class="t" x="9" y="9" width="382" height="582" rx="41"/>
+
+        <g clip-path="url(#shell-clip)">
+          <rect x="312" y="0" width="88" height="600" fill="url(#hatch)" stroke="none"/>
+          <rect x="0" y="548" width="400" height="52" fill="url(#hatch2)" stroke="none"/>
+          <!-- ribs: each groove is a firm line with a lighter return line under it -->
+          <g class="m">
+            <path d="M3 110H397M3 166H397M3 222H397M3 278H397M3 334H397M3 390H397M3 446H397M3 502H397"/>
+          </g>
+          <g class="t">
+            <path d="M3 117H397M3 173H397M3 229H397M3 285H397M3 341H397M3 397H397M3 453H397M3 509H397"/>
+          </g>
+          <g class="h">
+            <path d="M24 138H300M24 194H280M24 250H310M24 306H270M24 362H300M24 418H286M24 474H306"/>
+          </g>
+        </g>
+
+        <rect class="m p" x="164" y="128" width="72" height="22" rx="5"/>
+        <rect class="h" x="169" y="133" width="62" height="12" rx="3"/>
+
+        <path class="m" d="M22 560Q22 580 44 580M378 560Q378 580 356 580"/>
+        <rect class="o" x="0" y="0" width="400" height="600" rx="48"/>
+      </g>
+    </symbol>
+
+    <!-- inside of the lid: its lined floor. Items lie on it, under the mesh. -->
+    <symbol id="f-lidfloor" viewBox="-20 -150 440 800">
+      <g filter="url(#rough)">
+        <rect class="o p" x="0" y="0" width="400" height="600" rx="48"/>
+        <rect class="m p" x="30" y="30" width="340" height="540" rx="18"/>
+        <g clip-path="url(#lining-clip)">
+          <rect x="30" y="30" width="340" height="540" fill="url(#hatch)" stroke="none"/>
+        </g>
+        <rect class="t p" x="46" y="52" width="308" height="500" rx="14"/>
+      </g>
+    </symbol>
+
+    <!-- the zipped mesh pocket, drawn with no fill so the items show through -->
+    <symbol id="f-pocket" viewBox="-20 -150 440 800">
+      <g filter="url(#rough)">
+        <rect class="m" x="46" y="52" width="308" height="500" rx="14"/>
+        <path class="t" d="M60 83H340M60 92H340"/>
+        <path class="teeth" d="M78 87.5H338"/>
+        <rect class="m p" x="60" y="77" width="14" height="21" rx="3.5"/>
+        <path class="m" d="M67 98V108"/>
+        <ellipse class="m p" cx="67" cy="115" rx="4.5" ry="7"/>
+        <rect x="56" y="104" width="288" height="438" rx="10" fill="url(#mesh)" class="t"/>
+      </g>
+    </symbol>
+
+    <!-- inside of the base: the empty packing floor. No compression straps
+         (removed 2026-10-03): this is the space the items fill. -->
+    <symbol id="f-floor" viewBox="-20 -150 440 800">
+      <g filter="url(#rough)">
+        <rect class="o p" x="0" y="0" width="400" height="600" rx="48"/>
+        <rect class="m p" x="30" y="30" width="340" height="540" rx="18"/>
+        <g clip-path="url(#lining-clip)">
+          <rect x="30" y="30" width="46" height="540" fill="url(#hatch)" stroke="none"/>
+          <path class="h dash" d="M200 44V556"/>
+          <path class="h" d="M118 44V556M282 44V556"/>
+          <path class="h" d="M90 120Q150 170 108 240M300 150Q250 210 306 290M98 400Q160 430 116 500M290 380Q240 450 310 510M150 70Q200 92 250 72M150 532Q200 512 250 534"/>
+        </g>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="rig">
+  <div class="stage">
+
+
+    <div class="route" id="route" aria-hidden="true">
+      <span>TLV</span>
+      <div class="line"><svg class="plane" viewBox="-11 -11 22 22"><path d="M10 0L-3 -3.2L-7 -9H-9L-6.5 -2.6L-9.5 -1.6V1.6L-6.5 2.6L-9 9H-7L-3 3.2Z"/></svg></div>
+      <span>SEZ</span>
+    </div>
+
+    <div class="view" id="view">
+      <div class="world" id="world">
+
+        <div class="base" id="base">
+          <svg class="face tele" viewBox="-650 -20 800 440"><g transform="rotate(90)"><use href="#f-tele" x="-20" y="-150" width="440" height="800"/></g></svg>
+          <svg class="face" style="--z:0" viewBox="-650 -20 800 440"><g transform="rotate(90)"><use href="#f-floor" x="-20" y="-150" width="440" height="800"/></g></svg>
+
+          <!-- Base items, drawn lying: the body is x -600..0 (wheels at -600), y 0..400.
+               Sizes are to scale, one unit to about a millimetre. Shirts,
+               trousers and two pairs of shoes cover the floor; everything
+               after that lands on top, and the heap ends up well above the
+               rim. How high each item sits is worked out in the script from
+               what lies under it. Compaction presses shirts, trousers and all
+               the shoes into one low lump across the whole floor; the towel
+               and gadget settle onto it, and the coat and swimsuit follow. -->
+          <svg class="face item merge" data-item="shirts" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <rect class="m p" x="-565" y="35" width="260" height="160" rx="9"/>
+              <rect x="-565" y="170" width="260" height="25" fill="url(#hatch)" stroke="none"/>
+              <path class="t" d="M-470 35L-435 62L-400 35"/>
+              <path class="h dash" d="M-435 62V195"/>
+              <path class="h" d="M-565 115H-305"/>
+            </g>
+          </svg>
+
+          <svg class="face item merge" data-item="pants" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <rect class="m p" x="-565" y="205" width="260" height="160" rx="9"/>
+              <path class="t" d="M-565 222H-305"/>
+              <path class="t" d="M-435 222V365"/>
+              <path class="h" d="M-545 222Q-530 250 -505 240M-325 222Q-340 250 -365 240"/>
+              <path class="h" d="M-460 205V222M-410 205V222"/>
+            </g>
+          </svg>
+
+          <svg class="face item" data-item="towel" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <rect class="m p" x="-565" y="296" width="260" height="38" rx="14"/>
+              <path class="t" d="M-530 296V334M-340 296V334"/>
+              <path class="h" d="M-520 296V334M-350 296V334M-565 315H-305"/>
+            </g>
+          </svg>
+
+          <svg class="face item merge" data-item="shoes1" viewBox="-650 -20 800 440"><g class="low" filter="url(#rough)"><use href="#pair-low" x="-292" y="35"/></g><g class="high" filter="url(#rough)"><use href="#pair-high" x="-292" y="35"/></g></svg>
+          <svg class="face item merge extra" data-item="shoes2" viewBox="-650 -20 800 440"><g class="low" filter="url(#rough)"><use href="#pair-low" x="-292" y="203"/></g><g class="high" filter="url(#rough)"><use href="#pair-high" x="-292" y="203"/></g></svg>
+          <svg class="face item merge extra" data-item="shoes3" viewBox="-650 -20 800 440"><g class="low" filter="url(#rough)"><use href="#pair-low" x="-500" y="100"/></g><g class="high" filter="url(#rough)"><use href="#pair-high" x="-500" y="100"/></g></svg>
+          <svg class="face item merge extra" data-item="shoes4" viewBox="-650 -20 800 440"><g class="low" filter="url(#rough)"><use href="#pair-low" x="-290" y="110"/></g><g class="high" filter="url(#rough)"><use href="#pair-high" x="-290" y="110"/></g></svg>
+          <svg class="face item merge extra" data-item="shoes5" viewBox="-650 -20 800 440"><g class="low" filter="url(#rough)"><use href="#pair-low" x="-430" y="60"/></g><g class="high" filter="url(#rough)"><use href="#pair-high" x="-430" y="60"/></g></svg>
+
+          <svg class="face item" data-item="gadget" viewBox="-650 -20 800 440">
+            <g class="gbody" filter="url(#rough)">
+              <rect class="m p" x="-160" y="250" width="125" height="104" rx="12"/>
+              <rect class="t" x="-68" y="266" width="24" height="14" rx="4"/>
+              <rect class="t" x="-68" y="324" width="24" height="14" rx="4"/>
+              <circle class="t" cx="-56" cy="302" r="7"/>
+            </g>
+            <g class="lens" filter="url(#rough)">
+              <circle class="m p" cx="-112" cy="302" r="33"/>
+              <circle class="m" cx="-112" cy="302" r="23"/>
+              <circle cx="-112" cy="302" r="23" fill="url(#hatch)" stroke="none"/>
+              <path class="t" d="M-124 292Q-112 284 -100 292"/>
+            </g>
+          </svg>
+
+          <!-- What the clothes and shoes become once compacted: a vacuum bag.
+               Everything is still inside, and you can make out a collar, a
+               trouser seam and shoe soles through it, but nothing can be
+               taken out on its own any more. -->
+          <svg class="face lump" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <path class="o p" d="M-555 50Q-430 40 -300 48T-48 46Q-38 120 -44 200T-46 354Q-170 362 -300 356T-556 356Q-564 280 -558 200T-555 50Z"/>
+              <!-- what shows through the bag -->
+              <path class="m" d="M-430 112L-395 142L-360 112"/>
+              <path class="t" d="M-505 150H-300V245"/>
+              <path class="m" d="M-520 262H-365V342M-442 262V342"/>
+              <rect class="m" x="-285" y="72" width="185" height="58" rx="29"/>
+              <rect class="m" x="-292" y="150" width="185" height="58" rx="29"/>
+              <rect class="m" x="-330" y="252" width="185" height="58" rx="29" transform="rotate(-11 -237 281)"/>
+              <path class="h" d="M-250 86V116M-232 86V116M-214 86V116M-257 164V194M-239 164V194M-221 164V194"/>
+              <!-- creases pulled tight by the vacuum -->
+              <path class="t" d="M-540 62L-470 118M-542 342L-466 296M-108 62L-150 104M-106 342L-152 300M-300 52L-292 92M-300 352L-312 316M-552 200L-498 200M-340 120L-300 150L-342 186M-330 220L-296 240L-336 262M-470 190L-440 214L-474 240"/>
+              <!-- the valve the air is drawn out through -->
+              <circle class="m p" cx="-478" cy="92" r="21"/>
+              <circle class="t" cx="-478" cy="92" r="12"/>
+              <path class="t" d="M-478 80V104M-490 92H-466"/>
+              <!-- zip seal along the handle end, with its slider -->
+              <path class="m" d="M-82 50V352"/>
+              <path class="t" d="M-70 50V352"/>
+              <rect class="m p" x="-90" y="176" width="28" height="44" rx="6"/>
+            </g>
+          </svg>
+
+          <svg class="face item extra" data-item="coat" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <rect class="o p" x="-565" y="35" width="260" height="218" rx="14"/>
+              <rect x="-565" y="215" width="260" height="38" fill="url(#hatch)" stroke="none"/>
+              <rect class="t" x="-558" y="42" width="246" height="204" rx="10"/>
+              <path class="m" d="M-467 35L-435 118L-403 35"/>
+              <path class="h dash" d="M-435 118V253"/>
+              <path class="t" d="M-565 100H-520V253M-305 100H-350V253"/>
+              <circle class="t" cx="-420" cy="150" r="4"/>
+              <circle class="t" cx="-420" cy="190" r="4"/>
+              <circle class="t" cx="-420" cy="230" r="4"/>
+            </g>
+          </svg>
+
+          <svg class="face item" data-item="swim" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <!-- a one-piece, laid on top of the coat: straps, scooped neck, leg cut -->
+              <path class="o p" d="M-522 62C-517 86 -514 96 -527 112C-538 142 -532 178 -514 208H-456C-438 178 -432 142 -443 112C-456 96 -453 86 -448 62L-464 62C-467 84 -474 94 -485 94C-496 94 -503 84 -506 62Z"/>
+              <path class="t" d="M-514 208C-506 192 -500 187 -485 187C-470 187 -464 192 -456 208"/>
+              <path class="h" d="M-515 130Q-507 122 -499 130T-483 130T-467 130T-451 130M-518 158Q-510 150 -502 158T-486 158T-470 158T-454 158"/>
+            </g>
+          </svg>
+
+          <!-- thrown in on top of the vacuum bag, at an angle -->
+          <svg class="face item extra" data-item="shoes6" viewBox="-650 -20 800 440"><g class="low" filter="url(#rough)"><use href="#pair-low" x="-290" y="120"/></g><g class="high" filter="url(#rough)"><use href="#pair-high" x="-290" y="120"/></g></svg>
+
+          <svg class="face item" data-item="flipflops" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <rect class="m p" x="-300" y="250" width="230" height="78" rx="39"/>
+              <path class="t" d="M-250 289L-175 262M-250 289L-175 316"/>
+              <rect class="m p" x="-270" y="288" width="230" height="78" rx="39"/>
+              <path class="t" d="M-220 327L-145 300M-220 327L-145 354"/>
+            </g>
+          </svg>
+
+          <!-- the leak dripped down onto the base while the case was closed -->
+          <svg class="face stain" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <path class="m cream" d="M-520 150C-480 100 -400 110 -360 150C-300 120 -230 150 -240 200C-200 240 -260 290 -320 270C-370 310 -450 300 -470 250C-530 250 -550 190 -520 150Z"/>
+              <path fill="url(#hatch2)" stroke="none" d="M-520 150C-480 100 -400 110 -360 150C-300 120 -230 150 -240 200C-200 240 -260 290 -320 270C-370 310 -450 300 -470 250C-530 250 -550 190 -520 150Z"/>
+              <path class="m cream" d="M-150 110C-125 85 -80 95 -75 130C-55 160 -85 195 -120 185C-155 195 -175 145 -150 110Z"/>
+              <path fill="url(#hatch2)" stroke="none" d="M-150 110C-125 85 -80 95 -75 130C-55 160 -85 195 -120 185C-155 195 -175 145 -150 110Z"/>
+              <circle class="m cream" cx="-200" cy="300" r="13"/><circle class="m cream" cx="-330" cy="330" r="8"/><circle class="m cream" cx="-210" cy="90" r="8"/>
+            </g>
+          </svg>
+
+          <!-- wall slices and wheels are added here by script -->
+          <svg class="face" style="--z:100" viewBox="-650 -20 800 440"><g transform="rotate(90)"><use href="#f-rim" x="-20" y="-150" width="440" height="800"/></g></svg>
+        </div>
+
+        <div class="lid" id="lid">
+          <svg class="face" style="--z:0" viewBox="-650 -20 800 440"><g transform="rotate(90)"><use href="#f-rim" x="-20" y="-150" width="440" height="800"/></g></svg>
+          <!-- wall slices and wheels are added here by script -->
+          <svg class="face inside pocket" style="--z:86" viewBox="-650 -20 800 440"><g transform="rotate(90)"><use href="#f-pocket" x="-20" y="-150" width="440" height="800"/></g></svg>
+
+          <!-- Lid items, behind the mesh. Drawn lying, to scale; the pocket is
+               x -542..-104, y 56..344. The tube stays whole all through the
+               packing: it is only found squeezed, and leaking, at the beach. -->
+          <svg class="face item" data-item="meds" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <rect class="m p" x="-530" y="66" width="110" height="75" rx="7"/>
+              <path class="o" d="M-475 85V122M-494 103H-456"/>
+            </g>
+          </svg>
+
+          <svg class="face item" data-item="brush" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <rect class="m p" x="-530" y="156" width="170" height="32" rx="16"/>
+              <rect class="t" x="-516" y="169" width="96" height="6" rx="3"/>
+              <rect class="t" x="-418" y="163" width="40" height="18" rx="4"/>
+              <path class="h" d="M-410 166V178M-402 166V178M-394 166V178M-386 166V178"/>
+            </g>
+          </svg>
+
+          <svg class="face item" data-item="tube" viewBox="-650 -20 800 440">
+            <g class="full" filter="url(#rough)">
+              <path class="m p" d="M-530 204V262L-405 252V214Z"/>
+              <path class="t" d="M-522 208V258"/>
+              <rect class="m p" x="-405" y="222" width="8" height="22"/>
+              <rect class="m p" x="-397" y="216" width="20" height="34" rx="4"/>
+              <text class="tx" x="-466" y="238" font-size="13">קרם הגנה</text>
+            </g>
+            <g class="squeezed" filter="url(#rough)">
+              <path class="m p" d="M-530 210V256L-480 236L-405 250V216L-480 230Z"/>
+              <path class="t" d="M-522 214V252M-500 222L-488 233L-500 245"/>
+              <rect class="m p" x="-405" y="222" width="8" height="22"/>
+              <rect class="m p" x="-397" y="216" width="20" height="34" rx="4"/>
+            </g>
+          </svg>
+
+          <svg class="face item" data-item="hat" viewBox="-650 -20 800 440">
+            <g class="brim" filter="url(#rough)">
+              <circle class="m p" cx="-268" cy="150" r="84"/>
+              <circle class="h" cx="-268" cy="150" r="77"/>
+              <circle class="t" cx="-268" cy="150" r="53"/>
+            </g>
+            <g class="crown" filter="url(#rough)">
+              <circle class="m p" cx="-268" cy="150" r="32"/>
+              <path class="h" d="M-288 142Q-268 130 -248 142"/>
+            </g>
+          </svg>
+
+          <svg class="face item" data-item="glasses" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <rect class="m p" x="-350" y="262" width="46" height="32" rx="12"/>
+              <rect class="m p" x="-288" y="262" width="46" height="32" rx="12"/>
+              <path class="m" d="M-304 274H-288"/>
+              <path class="t" d="M-350 270L-362 262M-242 270L-230 262"/>
+            </g>
+          </svg>
+
+          <svg class="face item" data-item="passport" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <rect class="m p" x="-235" y="248" width="125" height="88" rx="6"/>
+              <circle class="t" cx="-172" cy="284" r="18"/>
+              <path class="h" d="M-190 284H-154M-172 266V302M-212 320H-132"/>
+            </g>
+          </svg>
+
+          <svg class="face item" data-item="wallet" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <rect class="m p" x="-528" y="278" width="100" height="60" rx="8"/>
+              <path class="t" d="M-528 300H-428"/>
+              <circle class="t" cx="-478" cy="300" r="5"/>
+            </g>
+          </svg>
+
+          <!-- the leak, found only when the case is opened at the destination -->
+          <svg class="face stain" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <path class="m cream" d="M-300 190C-280 150 -220 120 -170 140C-120 130 -110 190 -130 230C-110 280 -160 330 -220 320C-270 345 -340 330 -360 290C-420 300 -470 270 -460 220C-490 180 -440 130 -390 150C-360 120 -310 140 -300 190Z"/>
+              <path fill="url(#hatch2)" stroke="none" d="M-300 190C-280 150 -220 120 -170 140C-120 130 -110 190 -130 230C-110 280 -160 330 -220 320C-270 345 -340 330 -360 290C-420 300 -470 270 -460 220C-490 180 -440 130 -390 150C-360 120 -310 140 -300 190Z"/>
+              <circle class="m cream" cx="-490" cy="120" r="12"/><circle class="m cream" cx="-140" cy="300" r="9"/><circle class="m cream" cx="-500" cy="300" r="7"/>
+            </g>
+          </svg>
+
+          <svg class="face item" data-item="charger" viewBox="-650 -20 800 440">
+            <g filter="url(#rough)">
+              <rect class="m p" x="-168" y="80" width="55" height="55" rx="8"/>
+              <path class="m" d="M-154 80V64M-128 80V64"/>
+              <path class="t" d="M-140 135C-140 180 -110 180 -112 152C-114 136 -108 150 -112 180C-118 210 -150 214 -166 202"/>
+            </g>
+          </svg>
+
+          <svg class="face inside" style="--z:99" viewBox="-650 -20 800 440"><g transform="rotate(90)"><use href="#f-lidfloor" x="-20" y="-150" width="440" height="800"/></g></svg>
+          <svg class="face shell" style="--z:100" viewBox="-650 -20 800 440"><g transform="rotate(90)"><use href="#f-shell" x="-20" y="-150" width="440" height="800"/></g></svg>
+        </div>
+
+        <!-- Luggage tag, to scale (about 10 cm): on a short strap from the
+             handle end, lying on the ground beside the case, just below the
+             lowest label. It carries a line drawing of the Boost Me robot. -->
+        <svg class="tagplane" viewBox="560 230 200 280" aria-label="תג מזוודה עם הרובוט של Boost Me" role="img">
+          <g filter="url(#rough)">
+            <path class="m" d="M603 268C615 282 610 314 622 338"/>
+            <path class="t" d="M608 267C620 281 616 312 627 334"/>
+          </g>
+          <g transform="translate(662 331) rotate(-12)">
+            <g filter="url(#rough)">
+              <path class="o p" d="M-52 -14L-36 -31H48Q52 -31 52 -27V27Q52 31 48 31H-36L-52 14Z"/>
+              <circle class="m p" cx="-39" cy="0" r="5.5"/>
+              <!-- the robot from the logo: antenna, head with ears and eyes, arms up -->
+              <g transform="translate(12 1) scale(.86)" stroke-width="2.4">
+                <circle cx="0" cy="-28.2" r="2.2"/>
+                <path d="M0 -26V-23.8"/>
+                <path d="M-10.7 -12C-9 -20 -4 -23.8 0 -23.8C4 -23.8 9 -20 10.7 -12V-11C10.7 -8 8 -6 5 -6H-5C-8 -6 -10.7 -8 -10.7 -11Z"/>
+                <path d="M-10.7 -16.5H-12.6V-10H-10.7M10.7 -16.5H12.6V-10H10.7"/>
+                <circle cx="-4.2" cy="-15" r="1.8"/>
+                <circle cx="4.2" cy="-15" r="1.8"/>
+                <path d="M-8.7 -4C-14 -5.5 -18.5 -10 -20.7 -15L-19 -19.8L-22.7 -23.2L-27.4 -19L-27.2 -16.5C-25 -6 -19 1 -10.2 5L-9 13C-13 18 -14.5 24 -15.2 29.8H-7.2C-6.8 24 -4.5 17.8 0 17.8C4.5 17.8 6.8 24 7.2 29.8H15.2C14.5 24 13 18 9 13L10.2 5C19 1 25 -6 27.2 -16.5L27.4 -19L22.7 -23.2L19 -19.8L20.7 -15C18.5 -10 14 -5.5 8.7 -4Z"/>
+              </g>
+            </g>
+          </g>
+        </svg>
+
+        <!-- The same tag for the closing page, hanging from the pull handle
+             once the case stands. It lies in a plane just in front of the lid
+             face; rotate(90) turns it upright for the standing view. -->
+        <svg class="face tagup" style="--z:208" viewBox="-650 -20 800 440" aria-hidden="true">
+          <g transform="translate(40 300) rotate(90) scale(1.5)">
+            <g filter="url(#rough)">
+              <path class="m" d="M-39 0C-47 -22 -40 -44 -45 -62"/>
+              <path class="t" d="M-35 -2C-43 -22 -36 -44 -41 -62"/>
+            </g>
+            <g transform="rotate(-10)" filter="url(#rough)">
+              <path class="o p" d="M-52 -14L-36 -31H48Q52 -31 52 -27V27Q52 31 48 31H-36L-52 14Z"/>
+              <circle class="m p" cx="-39" cy="0" r="5.5"/>
+              <g transform="translate(12 1) scale(.86)" stroke-width="2.4">
+                <circle cx="0" cy="-28.2" r="2.2"/>
+                <path d="M0 -26V-23.8"/>
+                <path d="M-10.7 -12C-9 -20 -4 -23.8 0 -23.8C4 -23.8 9 -20 10.7 -12V-11C10.7 -8 8 -6 5 -6H-5C-8 -6 -10.7 -8 -10.7 -11Z"/>
+                <path d="M-10.7 -16.5H-12.6V-10H-10.7M10.7 -16.5H12.6V-10H10.7"/>
+                <circle cx="-4.2" cy="-15" r="1.8"/>
+                <circle cx="4.2" cy="-15" r="1.8"/>
+                <path d="M-8.7 -4C-14 -5.5 -18.5 -10 -20.7 -15L-19 -19.8L-22.7 -23.2L-27.4 -19L-27.2 -16.5C-25 -6 -19 1 -10.2 5L-9 13C-13 18 -14.5 24 -15.2 29.8H-7.2C-6.8 24 -4.5 17.8 0 17.8C4.5 17.8 6.8 24 7.2 29.8H15.2C14.5 24 13 18 9 13L10.2 5C19 1 25 -6 27.2 -16.5L27.4 -19L22.7 -23.2L19 -19.8L20.7 -15C18.5 -10 14 -5.5 8.7 -4Z"/>
+              </g>
+            </g>
+          </g>
+        </svg>
+
+        <!-- label anchors are added here by script -->
+      </div>
+    </div>
+
+    <div class="labels" id="labels"><svg class="leaders" id="leaders"></svg></div>
+
+    <!-- Caption copy below is the 2026-10-03 draft, not yet approved. -->
+    <div class="captions" id="captions">
+      <div class="gauge" id="gauge" aria-live="off">
+        <!-- a dial: green on the empty side, red on the full side -->
+        <svg class="dial" viewBox="0 0 120 68" aria-hidden="true">
+          <defs>
+            <linearGradient id="dial-ink" gradientUnits="userSpaceOnUse" x1="12" y1="0" x2="108" y2="0">
+              <stop offset="0" stop-color="#2F8F5B"/>
+              <stop offset=".5" stop-color="#D9A21B"/>
+              <stop offset="1" stop-color="#C8402F"/>
+            </linearGradient>
+          </defs>
+          <path class="track" d="M12 62A48 48 0 0 1 108 62"/>
+          <path class="rim" d="M7 62A53 53 0 0 1 113 62M17 62A43 43 0 0 1 103 62M7 62H17M103 62H113"/>
+          <path class="tick" d="M5 62H1M21.1 23.1L18.3 20.3M60 7V3M98.9 23.1L101.7 20.3M115 62H119"/>
+          <polygon class="needle" points="60,19 57,62 63,62"/>
+          <circle class="hub" cx="60" cy="62" r="5"/>
+        </svg>
+        <div class="read"><span>תפוסה</span><output id="gauge-num">0%</output></div>
+      </div>
+      <div class="stamp" id="stamp" aria-hidden="true">משקל עודף</div>
+      <div class="cap" data-s="0">
+        <h1>למה AI שוכח?</h1>
+        <p>התשובה נמצאת במזוודה אחת, בדרך לחופי סיישל.</p>
+      </div>
+      <div class="cap" data-s="1">
+        <span class="tag">CONTEXT WINDOW</span>
+        <p>אורזים לשבוע בחופי סיישל. המזוודה ריקה, ונראה שיש המון מקום, אבל הגודל קבוע. <b>זה ה-Context Window:</b> כמות המידע ש-AI מסוגל להחזיק בראש בבת אחת.</p>
+      </div>
+      <div class="cap" data-s="2">
+        <span class="tag">CONTEXT ENGINEERING</span>
+        <p>תרופות, כן. <span class="x">חמישה זוגות נעליים ומעיל לחוף</span>, פחות. כל דבר שנכנס תופס מקום של משהו אחר. <b>זה ה-Context Engineering:</b> לבחור מה נכנס ומה נשאר בבית.</p>
+      </div>
+      <div class="cap" data-s="3">
+        <span class="tag">COMPACTION</span>
+        <p>לא נסגר, אז דוחסים: בגדים ונעליים לשקית ואקום. <b>זה ה-Compaction:</b> לכווץ את מה שבפנים כדי לפנות מקום. נשאר גוש אחד: יודעים שיש שם בגדים, לא זוכרים אילו.</p>
+      </div>
+      <div class="cap" data-s="4">
+        <p>התפנה מקום! אז נכנסים גם מטען, בגד ים, כפכפים, ועוד זוג נעליים. שישי.</p>
+      </div>
+      <div class="cap" data-s="5">
+        <p>נסגר. בכוח, אבל נסגר.</p>
+      </div>
+      <div class="cap" data-s="6">
+        <p>במלון פותחים. קרם ההגנה על הכול, והחולצה שחיפשתם נבלעה בתוך הגוש. ככה AI שוכח: בשיחה ארוכה מדי, פרטים נמעכים ונבלעים בדרך.</p>
+      </div>
+      <div class="cap" data-s="7">
+        <p>והמעיל? AI עונה רק ממה שיש במזוודה. ארזתם מעיל, אז הוא ילביש אתכם במעיל, גם לחוף.</p>
+      </div>
+      <div class="cap end" data-s="8">
+        <h2>בפעם הבאה, אורזים אחרת</h2>
+        <ol class="tips">
+          <li>נושא חדש? פותחים שיחה חדשה, ומתחילים ממזוודה ריקה.</li>
+          <li>תנו ל-AI רק מה שהמשימה צריכה. את המעיל משאירים בבית.</li>
+          <li>שיחה ארוכה? חזרו על הפרטים החשובים, לפני שהם נמעכים.</li>
+        </ol>
+        <p class="ask">רוצים להבין איך זה נוגע לעסק שלכם?</p>
+        <a class="wa" href="https://wa.me/972526328774" target="_blank" rel="noopener">דברו איתנו בוואטסאפ</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const base = document.getElementById('base');
+  const lid = document.getElementById('lid');
+  const world = document.getElementById('world');
+
+  for (const half of [base, lid]) {
+    // walls: stack the outline through each half's depth (0..100 units)
+    for (let z = 10; z <= 90; z += 10) {
+      const ring = document.createElement('div');
+      ring.className = 'ring';
+      ring.style.setProperty('--z', z);
+      half.appendChild(ring);
+    }
+    // two wheels per half; --d is the offset along the axle
+    for (const y of [62, 338]) {
+      const wheel = document.createElement('div');
+      wheel.className = 'wheel';
+      wheel.style.setProperty('--y', y);
+      wheel.innerHTML =
+        [-7, -3.5, 0, 3.5, 7].map(d => `<div class="tire" style="--d:${d}"></div>`).join('') +
+        [-8, 8].map(d => `<svg class="hub" style="--d:${d}" viewBox="-17 -17 34 34"><use href="#f-hub" x="-17" y="-17" width="34" height="34"/></svg>`).join('') +
+        [-11, 11].map(d => `<svg class="fork" style="--d:${d}" viewBox="-46 -20 52 40"><use href="#f-fork" x="-46" y="-20" width="52" height="40"/></svg>`).join('');
+      half.appendChild(wheel);
+    }
+    // straight wall runs: [class, x, y] for the outer and inner face of each side
+    const walls = [
+      ['wx', 48, 400], ['wx', 48, 370], ['wx', 48, 30], ['wx', 48, 0],
+      ['wy', 0, 48], ['wy', 30, 48], ['wy', 570, 48], ['wy', 600, 48],
+    ];
+    for (const [cls, x, y] of walls) {
+      const wall = document.createElement('div');
+      wall.className = 'wall ' + cls;
+      wall.style.setProperty('--x', x);
+      wall.style.setProperty('--y', y);
+      half.appendChild(wall);
+    }
+  }
+
+  // The script. `at` is the scroll time an item drops in (scene number +
+  // fraction); `w` is its share of the capacity gauge. Needed and unneeded
+  // things go in alternately, which is how the clutter builds up unnoticed.
+  const ITEMS = [
+    {id:'meds',     at:2.04, w:4},
+    {id:'shoes1',   at:2.10, w:7},
+    {id:'shirts',   at:2.15, w:10},
+    {id:'shoes2',   at:2.21, w:7},
+    {id:'pants',    at:2.26, w:10},
+    {id:'hat',      at:2.32, w:5},
+    {id:'shoes3',   at:2.37, w:7},
+    {id:'towel',    at:2.43, w:8},
+    {id:'gadget',   at:2.48, w:10},
+    {id:'passport', at:2.54, w:1},
+    {id:'brush',    at:2.59, w:3},
+    {id:'shoes4',   at:2.65, w:7},
+    {id:'tube',     at:2.70, w:4},
+    {id:'wallet',   at:2.76, w:2},
+    {id:'glasses',  at:2.81, w:3},
+    {id:'shoes5',   at:2.86, w:7},
+    // the last straw: a coat, for a beach holiday
+    {id:'coat',     at:2.93, w:14},
+    {id:'charger',  at:4.10, w:3},
+    {id:'swim',     at:4.30, w:3},
+    {id:'shoes6',   at:4.50, w:7},
+    {id:'flipflops',at:4.70, w:3},
+  ];
+  const COMPACT_AT = 3.25;
+  // compaction frees room: clothes and shoes are pressed into one low lump
+  const COMPACT_SAVING = 25;
+
+  // Labels sit in a column beside the case, with a line to the item. Each has
+  // an anchor at world x/y/z (the open lid is negative y). `show` and `text`
+  // read the current state: which items are packed, and whether compacted.
+  const shoeCount = st => ['shoes1','shoes2','shoes3','shoes4','shoes5'].filter(id => st.packed.has(id)).length;
+  const LABELS = [
+    {side:'left',  x:125, y:-297, z:44, text:() => 'תרופות',            show:st => st.packed.has('meds')},
+    {side:'left',  x:170, y:-228, z:26, text:() => 'מברשת שיניים',      show:st => st.packed.has('brush')},
+    {side:'left',  x:145, y:-167, z:34, text:() => 'קרם הגנה',          show:st => st.packed.has('tube')},
+    {side:'left',  x:122, y:-92,  z:18, text:() => 'ארנק',              show:st => st.packed.has('wallet')},
+    {side:'right', x:460, y:-293, z:34, text:() => 'מטען',              show:st => st.packed.has('charger')},
+    {side:'right', x:332, y:-250, z:46, text:() => 'כובע',              show:st => st.packed.has('hat')},
+    {side:'right', x:304, y:-122, z:16, text:() => 'משקפי שמש',         show:st => st.packed.has('glasses')},
+    {side:'right', x:428, y:-108, z:12, text:() => 'דרכון',             show:st => st.packed.has('passport')},
+    // the coat lands on top of the shirts and trousers and hides them
+    {side:'left',  x:60,  y:60,   of:'shirts', text:() => 'חולצות',     show:st => st.packed.has('shirts') && !st.packed.has('coat')},
+    {side:'left',  x:65,  y:232,  of:'pants',  text:() => 'מכנסיים',    show:st => st.packed.has('pants') && !st.packed.has('coat')},
+    {side:'left',  x:230, y:70,   of:'coat',   extra:true, text:() => 'מעיל, ליתר ביטחון', show:st => st.packed.has('coat')},
+    {side:'left',  x:165, y:330,  of:'towel',  text:() => 'מגבת',       show:st => st.packed.has('towel')},
+    {side:'right', x:540, y:55,   of:'shoes1', extra:st => shoeCount(st) > 1, text:st => shoeCount(st) < 2 ? 'נעליים' : shoeCount(st) + ' זוגות נעליים',
+                                                show:st => shoeCount(st) > 0 && !st.compact},
+    {side:'right', x:500, y:80,   of:'lump',   text:st => st.atHotel ? 'החולצה? איפשהו בפנים' : 'שקית ואקום', show:st => st.compact},
+    {side:'left',  x:115, y:150,  of:'swim',   text:() => 'בגד ים',     show:st => st.packed.has('swim')},
+    {side:'right', x:440, y:190,  of:'shoes6', extra:true, text:() => 'ועוד זוג נעליים', show:st => st.packed.has('shoes6')},
+    // the flip-flops end up lying on the gadget and hide it
+    {side:'right', x:503, y:320,  of:'gadget', text:() => 'מצלמה',    show:st => st.packed.has('gadget') && !st.packed.has('flipflops')},
+    {side:'right', x:440, y:318,  of:'flipflops', text:() => 'כפכפים',  show:st => st.packed.has('flipflops')},
+  ];
+
+  const labels = document.getElementById('labels');
+  const leaders = document.getElementById('leaders');
+  const stage = document.querySelector('.stage');
+  const SVG = 'http://www.w3.org/2000/svg';
+  // Give every item real volume. BODIES lists, per item, its height `h` and
+  // its footprint boxes [x, y, width, height, corner radius, clip?] in the
+  // same lying coordinates the drawings use. The tube has two states, each
+  // with its own body.
+  // a pair of shoes: the low front runs the whole length, the collar rises at the heel end
+  const shoes = (cx, cy, rot) => ({rot, states:[
+    {cls:'low', h:22, boxes:[[cx, cy + 2, 250, 76, 38], [cx, cy + 84, 250, 76, 38]]},
+    {cls:'high', from:22, h:40, taper:4, step:6, boxes:[[cx + 118, cy + 9, 128, 62, 30], [cx + 118, cy + 91, 128, 62, 30]]},
+  ]});
+  const BODIES = {
+    // three folded shirts, not quite squared up
+    shirts: {states:[
+      {noFace:true, h:15, boxes:[[-559, 40, 260, 160, 9]]},
+      {noFace:true, from:15, h:30, boxes:[[-570, 31, 260, 160, 9]]},
+      {from:30, h:44, boxes:[[-565, 35, 260, 160, 9]]},
+    ]},
+    // two folded pairs of trousers
+    pants:  {states:[
+      {noFace:true, h:18, boxes:[[-558, 209, 260, 160, 9]]},
+      {from:18, h:36, boxes:[[-565, 205, 260, 160, 9]]},
+    ]},
+    // rolled up: the stack narrows across the roll toward the top
+    towel:  {h:44, taper:[0, 26], step:5, boxes:[[-565, 270, 260, 90, 26]]},
+    shoes1: shoes(-292, 35),
+    shoes2: shoes(-292, 203),
+    shoes3: shoes(-500, 100),
+    shoes4: shoes(-290, 110),
+    shoes5: shoes(-430, 60),
+    // a camera: flat body, with the lens standing proud of it
+    gadget: {states:[
+      {cls:'gbody', h:30, boxes:[[-160, 250, 125, 104, 12]]},
+      {cls:'lens', from:30, h:54, step:6, boxes:[[-145, 269, 66, 66, 33]]},
+    ]},
+    lump:   {h:40, boxes:[[-560, 44, 520, 314, 18]]},
+    coat:   {h:45, boxes:[[-565, 35, 260, 218, 14]]},
+    swim:   {h:10, boxes:[[-532, 64, 94, 142, 30]]},
+    meds:   {h:40, boxes:[[-530, 66, 110, 75, 7]]},
+    brush:  {h:22, boxes:[[-530, 156, 170, 32, 16]]},
+    // a thin brim with a domed crown rising out of it
+    hat:    {states:[
+      {cls:'brim', h:6, boxes:[[-352, 66, 168, 168, 84]]},
+      {cls:'crown', from:6, h:42, taper:14, step:4, boxes:[[-314, 104, 92, 92, 46]]},
+    ]},
+    glasses:{h:12, boxes:[[-350, 262, 46, 32, 12], [-288, 262, 46, 32, 12]]},
+    charger:{h:30, boxes:[[-168, 80, 55, 55, 8]]},
+    passport:{h:8, boxes:[[-235, 248, 125, 88, 6]]},
+    wallet: {h:14, boxes:[[-528, 278, 100, 60, 8]]},
+    shoes6: shoes(-290, 120, 9),
+    flipflops:{h:8, rot:-7, boxes:[[-300, 250, 230, 78, 39], [-270, 288, 230, 78, 39]]},
+    tube:   {states:[
+      {cls:'full', h:30, boxes:[[-530, 204, 125, 58, 0, 'polygon(0 0, 100% 17%, 100% 83%, 0 100%)'], [-405, 216, 28, 34, 4]]},
+      {cls:'squeezed', h:12, boxes:[[-530, 210, 125, 46, 0, 'polygon(0 0, 40% 43%, 100% 13%, 100% 87%, 40% 57%, 0 100%)'], [-405, 216, 28, 34, 4]]},
+    ]},
+  };
+  // an item built from several parts: its footprint is all of them, its height the tallest
+  for (const body of Object.values(BODIES)) {
+    if (!body.states || body.boxes) continue;
+    body.boxes = body.states.filter(state => !state.cls || state.cls !== 'squeezed').flatMap(state => state.boxes);
+    body.h = Math.max(...body.states.map(state => state.h));
+  }
+  // where an item's underside sits: just above the base floor; on the lid floor
+  const FLOOR = {base: 8, lid: 0};
+  const SLAB_STEP = 9;
+
+  // Stacking, in three passes, in the order things are packed. Each item
+  // rests on the highest thing its footprint overlaps.
+  //  1. before compaction: the heap as it builds up
+  //  2. at compaction: what was not merged settles onto the vacuum bag
+  //  3. after compaction: new items land on the bag and on what settled
+  const MERGED = ['shirts', 'pants', 'shoes1', 'shoes2', 'shoes3', 'shoes4', 'shoes5'];
+  const overlaps = (a, b) => a.some(([ax, ay, aw, ah]) => b.some(([bx, by, bw, bh]) =>
+    ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah));
+  const inBase = new Set([...base.querySelectorAll('svg.item')].map(svg => svg.dataset.item));
+  const restOn = (pile, boxes) => Math.max(FLOOR.base, ...pile.filter(o => overlaps(o.boxes, boxes)).map(o => o.top));
+  const early = ITEMS.filter(item => inBase.has(item.id) && item.at < COMPACT_AT);
+  const late = ITEMS.filter(item => inBase.has(item.id) && item.at >= COMPACT_AT);
+  const bottoms = {lump: FLOOR.base};
+  const tops = {lump: FLOOR.base + BODIES.lump.h};
+  const settle = {};
+  const topsAfter = {};
+  const heap = [];
+  for (const item of early) {
+    const boxes = BODIES[item.id].boxes;
+    bottoms[item.id] = restOn(heap, boxes);
+    tops[item.id] = bottoms[item.id] + BODIES[item.id].h;
+    heap.push({boxes, top:tops[item.id]});
+  }
+  const settled = [{boxes:BODIES.lump.boxes, top:tops.lump}];
+  for (const item of early) {
+    if (MERGED.includes(item.id)) continue;
+    const boxes = BODIES[item.id].boxes;
+    const bottom = restOn(settled, boxes);
+    settle[item.id] = bottom - bottoms[item.id];
+    topsAfter[item.id] = bottom + BODIES[item.id].h;
+    settled.push({boxes, top:topsAfter[item.id]});
+  }
+  for (const item of late) {
+    const boxes = BODIES[item.id].boxes;
+    bottoms[item.id] = restOn(settled, boxes);
+    tops[item.id] = bottoms[item.id] + BODIES[item.id].h;
+    settled.push({boxes, top:tops[item.id]});
+  }
+  // a label points at the top of the item it names, before and after compaction
+  for (const label of LABELS) if (label.of) { label.z = tops[label.of]; label.zAfter = topsAfter[label.of]; }
+  // `taper` narrows the stack toward the top, for rounded things like the
+  // crown of a hat; `step` sets how finely it is sliced
+  function addSlabs(group, boxes, from, height, cls, taper = 0, step = SLAB_STEP){
+    for (let z = from; z < from + height - 2; z += step) {
+      // taper can be one number, or [along, across] to narrow one way only (a roll)
+      const [tx, ty] = Array.isArray(taper) ? taper : [taper, taper];
+      const f = ((z - from) / height) ** 2;
+      for (const [bx, by, bw, bh, br, clip] of boxes) {
+        const [x, y, w, h, r] = [bx + tx * f, by + ty * f, bw - 2 * tx * f, bh - 2 * ty * f, Math.max(0, br - Math.max(tx, ty) * f)];
+        const slab = document.createElement('div');
+        slab.className = cls ? 'slab ' + cls : 'slab';
+        const vars = {x: x + 600, y, w, h, r, z};
+        for (const k in vars) slab.style.setProperty('--' + k, vars[k]);
+        if (clip) slab.style.clipPath = clip;
+        group.appendChild(slab);
+      }
+    }
+  }
+  for (const svg of world.querySelectorAll('svg.item, svg.lump')) {
+    const isLump = svg.classList.contains('lump');
+    const id = isLump ? 'lump' : svg.dataset.item;
+    const body = BODIES[id];
+    const floor = svg.closest('.lid') ? FLOOR.lid : bottoms[id];
+    const group = document.createElement('div');
+    group.className = svg.getAttribute('class').replace('face', '').trim();
+    if (!isLump) group.dataset.item = id;
+    svg.before(group);
+    if (settle[id]) group.style.setProperty('--settle', settle[id]);
+    const states = body.states || [{h: body.h, boxes: body.boxes}];
+    // an item thrown in at an angle gets an inner holder that carries the turn
+    let holder = group;
+    if (body.rot) {
+      const all = states.flatMap(state => state.boxes);
+      const left = Math.min(...all.map(b => b[0])), right = Math.max(...all.map(b => b[0] + b[2]));
+      const near = Math.min(...all.map(b => b[1])), far = Math.max(...all.map(b => b[1] + b[3]));
+      holder = document.createElement('div');
+      holder.className = 'spin';
+      holder.style.setProperty('--ox', (left + right) / 2 + 600);
+      holder.style.setProperty('--oy', (near + far) / 2);
+      holder.style.setProperty('--rot', body.rot + 'deg');
+      group.appendChild(holder);
+    }
+    // one drawn face per part; a part marked noFace is body only
+    let used = false;
+    const faces = states.map(state => {
+      if (state.noFace) return null;
+      const face = used ? svg.cloneNode(true) : svg;
+      used = true;
+      return face;
+    });
+    states.forEach((state, i) => {
+      // a part can start above the item's underside (`from`), e.g. a crown on a brim
+      const lift = state.from || 0;
+      addSlabs(holder, state.boxes, floor + lift, state.h - lift, state.cls, state.taper, state.step);
+      const top = faces[i];
+      if (!top) return;
+      if (state.cls) {
+        for (const g of [...top.querySelectorAll(':scope > g')]) if (!g.classList.contains(state.cls)) g.remove();
+      }
+      top.setAttribute('class', state.cls ? 'face top ' + state.cls : 'face top');
+      top.removeAttribute('data-item');
+      top.style.setProperty('--z', floor + state.h);
+      holder.appendChild(top);
+    });
+  }
+
+  for (const item of ITEMS) item.el = world.querySelector(`[data-item="${item.id}"]`);
+  for (const label of LABELS) {
+    // which packed item this label names (used to find the newest one on a phone)
+    label.itemId = label.of || (/packed\.has\('(\w+)'\)/.exec(label.show.toString()) || [])[1];
+    label.anchor = document.createElement('div');
+    label.anchor.className = 'anchor';
+    for (const k of ['x', 'y', 'z']) label.anchor.style.setProperty('--' + k, label[k]);
+    world.appendChild(label.anchor);
+    label.el = document.createElement('div');
+    label.el.className = 'label ' + label.side;
+    labels.appendChild(label.el);
+    label.line = document.createElementNS(SVG, 'line');
+    label.dot = document.createElementNS(SVG, 'circle');
+    label.dot.setAttribute('r', 2.5);
+    leaders.append(label.line, label.dot);
+  }
+
+  // Put each visible label in its side column, level with its item where
+  // possible, pushed down when the one above it is in the way.
+  function placeLabels(){
+    const origin = stage.getBoundingClientRect();
+    const unit = world.offsetWidth / 600;
+    const halves = [base, lid].map(el => el.getBoundingClientRect());
+    for (const l of LABELS) l.el.classList.toggle('mid', narrow);
+    if (narrow) {
+      // phone: the single label sits on a chip just under the case, clear of the tag
+      const y = Math.max(...halves.map(r => r.bottom)) - origin.top + 22;
+      for (const l of LABELS) {
+        if (!l.on) continue;
+        const at = l.anchor.getBoundingClientRect();
+        const ax = at.left - origin.left, ay = at.top - origin.top;
+        const half = l.el.offsetWidth / 2;
+        const x = Math.max(half + 8, Math.min(ax, origin.width - 112 - half));
+        l.el.style.left = x + 'px';
+        l.el.style.top = y + 'px';
+        l.line.setAttribute('x1', x); l.line.setAttribute('y1', y - 12);
+        l.line.setAttribute('x2', ax); l.line.setAttribute('y2', ay);
+        l.dot.setAttribute('cx', ax); l.dot.setAttribute('cy', ay);
+      }
+      return;
+    }
+    const column = {
+      left: Math.min(...halves.map(r => r.left)) - origin.left - 52 * unit - 8,
+      right: Math.max(...halves.map(r => r.right)) - origin.left + 12,
+    };
+    for (const side of ['left', 'right']) {
+      const shown = LABELS.filter(l => l.side === side && l.on);
+      for (const l of shown) {
+        const at = l.anchor.getBoundingClientRect();
+        l.ax = at.left - origin.left;
+        l.ay = at.top - origin.top;
+      }
+      shown.sort((a, b) => a.ay - b.ay);
+      let floor = -Infinity;
+      for (const l of shown) {
+        const height = l.el.offsetHeight || 24;
+        const width = l.el.offsetWidth;
+        const y = Math.max(l.ay, floor + height / 2);
+        floor = y + height / 2 + 5;
+        // keep the label fully on screen, even if that nudges it over the case
+        const x = side === 'left'
+          ? Math.max(column.left, width + 4)
+          : Math.min(column.right, origin.width - width - 4);
+        l.el.style.left = x + 'px';
+        l.el.style.top = y + 'px';
+        l.line.setAttribute('x1', x); l.line.setAttribute('y1', y);
+        l.line.setAttribute('x2', l.ax); l.line.setAttribute('y2', l.ay);
+        l.dot.setAttribute('cx', l.ax); l.dot.setAttribute('cy', l.ay);
+      }
+    }
+  }
+
+  const wideQuery = matchMedia('(min-width:900px) and (min-aspect-ratio:5/4)');
+  let narrow = !wideQuery.matches;
+  const captionsBox = document.getElementById('captions');
+  const rig = document.querySelector('.rig');
+  const caps = [...document.querySelectorAll('.cap')];
+  const gauge = document.getElementById('gauge');
+  const gaugeNum = document.getElementById('gauge-num');
+  const stamp = document.getElementById('stamp');
+  const route = document.getElementById('route');
+  const view = document.getElementById('view');
+  let wasShut = false;
+  const SCENES = 9;
+  // ?t=2.9 pins the scroll time, for checking a single frame without scrolling
+  const pinned = new URLSearchParams(location.search).get('t');
+  const clamp01 = v => Math.min(1, Math.max(0, v));
+  const ease = t => t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+
+  function update(){
+    const scrollable = rig.offsetHeight - window.innerHeight;
+    const t = pinned !== null ? Number(pinned)
+      : clamp01(window.scrollY / scrollable) * SCENES;
+    const s = Math.min(SCENES - 1, Math.floor(t));
+    const local = t - s;
+
+    // The case starts open. It closes once, when the packing is done
+    // (scene 5), and opens once, at the destination (scene 6).
+    let p = 1;
+    if (s === 5) p = 1 - ease(clamp01(local / .7));
+    else if (s === 6) p = ease(clamp01(local / .3));
+    // closing page: the case shuts, then stands up
+    let stand = 0;
+    if (s === 8) { p = 1 - ease(clamp01(local / .35)); stand = ease(clamp01((local - .35) / .45)); }
+    document.documentElement.style.setProperty('--p', p);
+    document.documentElement.style.setProperty('--stand', stand);
+    world.classList.toggle('standing', stand > .02);
+    world.classList.toggle('stood', stand > .9);
+    captionsBox.classList.toggle('ending', s === 8);
+
+    const state = {packed: new Set(), compact: t >= COMPACT_AT, atHotel: s >= 6};
+    let load = 0;
+    for (const item of ITEMS) {
+      const packed = t >= item.at;
+      item.el.classList.toggle('in', packed);
+      if (packed) { state.packed.add(item.id); load += item.w; }
+    }
+    world.classList.toggle('compact', state.compact);
+    world.classList.toggle('packed', state.packed.size > 0);
+    // the leak is only discovered once the case is open at the destination
+    // (it happens while the case is shut, so it is already there as the lid lifts)
+    world.classList.toggle('ruined', s >= 6 || (s === 5 && p < .05));
+    world.classList.toggle('splat', s >= 6 && p > .45);
+    // forced shut: the whole drawing jolts once as the lid meets the base
+    const shut = s === 5 && p < .02;
+    if (shut && !wasShut) { view.classList.remove('slam'); void view.offsetWidth; view.classList.add('slam'); }
+    wasShut = shut;
+
+    const labelsOn = p > .98 && s >= 2 && s !== 5;
+    // On a phone there is room for one label: the newest thing in the case.
+    // (At the hotel that is the vacuum bag; in the coat scene, the coat.)
+    narrow = !wideQuery.matches;
+    let focus = null;
+    if (narrow && labelsOn) {
+      const when = l => l.of === 'lump' ? (state.atHotel ? 6 : COMPACT_AT)
+        : l.of === 'shoes1' ? Math.max(0, ...ITEMS.filter(i => /^shoes[1-5]$/.test(i.id) && state.packed.has(i.id)).map(i => i.at))
+        : (ITEMS.find(i => i.id === l.itemId) || {at:0}).at;
+      if (s === 7) focus = LABELS.find(l => l.of === 'coat');
+      if (!focus) for (const l of LABELS) if (l.show(state) && (!focus || when(l) >= when(focus))) focus = l;
+    }
+    for (const label of LABELS) {
+      label.on = labelsOn && label.show(state) && (!focus || label === focus);
+      if (label.on) label.el.textContent = label.text(state);
+      label.anchor.style.setProperty('--z', state.compact && label.zAfter != null ? label.zAfter : label.z);
+      const extra = typeof label.extra === 'function' ? label.extra(state) : !!label.extra;
+      for (const el of [label.el, label.line, label.dot]) el.classList.toggle('extra', extra);
+      label.el.classList.toggle('on', label.on);
+      label.line.classList.toggle('on', label.on);
+      label.dot.classList.toggle('on', label.on);
+    }
+    if (labelsOn) placeLabels();
+
+    if (state.compact) load -= COMPACT_SAVING;
+    load = Math.min(100, Math.max(0, load));
+    gauge.classList.toggle('on', s >= 1 && s !== 5 && s !== 8);
+    gauge.style.setProperty('--lvl', load / 100);
+    gaugeNum.textContent = load + '%';
+    stamp.classList.toggle('on', load >= 100 && s >= 1 && s !== 5 && s !== 8);
+    route.style.setProperty('--trip', clamp01(t / (SCENES - .5)));
+
+    for (const cap of caps) cap.classList.toggle('on', Number(cap.dataset.s) === s);
+    // the dial stays in one place: under the longest caption
+    gauge.parentElement.style.setProperty('--under', (Math.max(...caps.filter(cap => !cap.classList.contains('end')).map(cap => cap.offsetHeight)) + 18) + 'px');
+  }
+  window.addEventListener('scroll', update, {passive:true});
+  window.addEventListener('resize', update);
+  update();
+</script>
+
+</body>
+</html>
