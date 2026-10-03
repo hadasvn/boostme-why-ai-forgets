@@ -1243,10 +1243,8 @@
   // gets the most room.
   const LENGTHS = [.45, .7, 2.4, 1, 1, .55, 1, .9, 1.25];
   const TOTAL = LENGTHS.reduce((a, b) => a + b, 0);
-  // Temporary, for choosing the pace on a real phone: ?pace=slow or ?pace=fast
-  // stretches or shrinks the whole scroll. Remove before launch.
-  const PACE = {slow: 1.3, fast: .75}[new URLSearchParams(location.search).get('pace')] || 1;
-  rig.style.height = (TOTAL * 115 * PACE + 100) + 'vh';
+  // 150vh of scrolling per unit: the slow pace, chosen on a real phone
+  rig.style.height = (TOTAL * 150 + 100) + 'vh';
   // scroll fraction (0..1) → story time (scene number + fraction)
   function timeAt(fraction){
     let left = fraction * TOTAL;
