@@ -34,8 +34,8 @@
     /* --ubase: as wide as the screen allows, but never so big that the case
        (about 840 units tall with its label and tag) plus the caption and dial
        under it (about 330px) overflow the visible height */
-    --ubase:min(92vw / 740, (100vh - 330px) / 840);
-    --ubase:min(92vw / 740, (100dvh - 330px) / 840);
+    --ubase:min(92vw / 740, (100vh - 380px) / 840);
+    --ubase:min(92vw / 740, (100dvh - 380px) / 840);
     --u:calc(var(--ubase) * (1 - var(--stand) * .4));
     /* where the body starts, left of centre: centred while open, moved over
        when closed to make room for the pull handle */
@@ -320,7 +320,7 @@
   }
 
   /* scroll hint on the title screen */
-  .hint{position:absolute;z-index:3;left:50%;bottom:max(22px, env(safe-area-inset-bottom,0px) + 14px);
+  .hint{position:absolute;z-index:3;left:50%;bottom:max(58px, env(safe-area-inset-bottom,0px) + 50px);
     transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;
     font-size:.95rem;font-weight:500;white-space:nowrap;opacity:0;transition:opacity .4s ease;pointer-events:none;}
   .hint.on{opacity:1;}
@@ -330,6 +330,27 @@
     .hint svg,.view.slam{animation:none;}
     .item,.stain,.stamp,.dial .needle,.lump{transition-timing-function:ease;transition-duration:.2s;}
   }
+
+  /* footer: a slim bar that stays put, so the legal links are always in reach */
+  .legal{position:fixed;z-index:10;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;justify-content:center;
+    align-items:center;gap:2px 14px;padding:5px 12px max(5px, env(safe-area-inset-bottom,0px));
+    background:color-mix(in srgb, var(--bg) 92%, transparent);border-top:1px solid color-mix(in srgb, var(--line) 25%, transparent);
+    font-size:12.5px;line-height:1.3;}
+  .legal button{appearance:none;background:none;border:0;padding:4px 2px;min-height:24px;font:inherit;color:inherit;
+    text-decoration:underline;text-underline-offset:3px;cursor:pointer;}
+  .legal button:hover{color:var(--extra);}
+  .legal button:focus-visible,.modal .close:focus-visible,.modal a:focus-visible{outline:3px solid var(--extra);outline-offset:2px;}
+  .legal .rights{opacity:.85;}
+
+  .modal{width:min(92vw, 540px);max-height:86vh;padding:26px 24px 22px;border:2px solid var(--line);border-radius:10px;
+    background:var(--paper);color:var(--line);font-size:1rem;line-height:1.65;}
+  .modal::backdrop{background:rgba(30,58,110,.35);}
+  .modal h2{margin:0 0 .5em;font-size:1.35rem;font-weight:800;}
+  .modal p{margin:0 0 .85em;}
+  .modal p:last-child{margin-bottom:0;}
+  .modal a{color:inherit;}
+  .modal .close{position:absolute;top:10px;left:10px;width:36px;height:36px;border:1.5px solid var(--line);border-radius:50%;
+    background:var(--paper);color:inherit;font-size:1rem;line-height:1;cursor:pointer;}
 
   /* capacity gauge: how full the case is */
   /* it sits under the caption text and stays put from scene to scene;
@@ -884,6 +905,52 @@
 
   </div>
 </main>
+
+<footer class="legal">
+  <button type="button" id="a11y-open">הצהרת נגישות</button>
+  <button type="button" id="privacy-open">הצהרת פרטיות</button>
+  <button type="button" id="terms-open">תנאי שימוש</button>
+  <span class="rights">© 2026 Boost Me. כל הזכויות שמורות.</span>
+</footer>
+
+<dialog class="modal" id="a11y-modal" aria-labelledby="a11y-title">
+  <button type="button" class="close" aria-label="סגירה">✕</button>
+  <h2 id="a11y-title">הצהרת נגישות</h2>
+  <p>עמוד זה נבנה מתוך מחויבות לאפשר שימוש נוח לכלל הגולשים, בהתאם לתקנות שוויון זכויות לאנשים עם מוגבלות (התאמות נגישות לשירות), תשע"ג–2013, ברמת התאמה AA לפי תקן <span dir="ltr" style="white-space:nowrap">WCAG 2.1</span>.</p>
+  <p>ההנגשות שבוצעו: ניווט מקלדת מלא (<span dir="ltr">Tab, Enter, Escape</span>), חיווי מיקוד ברור על כל רכיב הניתן ללחיצה, תיאור טקסטואלי לשרטוט עבור קוראי מסך, ניגודיות צבעים העומדת בדרישות התקן, וכיבוד הגדרת "הפחתת תנועה" של מערכת ההפעלה.</p>
+  <p>מגבלה ידועה: הסיפור מוצג בשרטוט שמשתנה בגלילה; קוראי מסך מקבלים את כל הכיתובים, אך לא תיאור של כל שלב בשרטוט.</p>
+  <p>לעמוד זה, המוצג באופן מקוון בלבד, אין סניף פיזי.</p>
+  <p>נתקלתם בבעיית נגישות? נשמח לדעת: צוות Boost Me, <a href="mailto:boost@boost-me.digital">boost@boost-me.digital</a></p>
+  <p>עדכון אחרון: 03.10.2026</p>
+</dialog>
+
+<dialog class="modal" id="privacy-modal" aria-labelledby="privacy-title">
+  <button type="button" class="close" aria-label="סגירה">✕</button>
+  <h2 id="privacy-title">הצהרת פרטיות</h2>
+  <p>פנייה אלינו נעשית באופן וולונטרי, בלחיצה על כפתור הוואטסאפ. כל פרט שתבחרו לשתף בשיחה (כגון שם או מספר טלפון) מועבר ישירות אלינו דרך WhatsApp, בהתאם למדיניות הפרטיות של Meta, ואינו נאסף או נשמר על ידי האתר עצמו.</p>
+  <p>האתר אינו שומר עוגיות ואינו משתמש בכלי מעקב, והגופנים נטענים מהאתר עצמו. האתר מתארח ב-GitHub Pages, שמקבל את כתובת ה-IP שלכם לצורך הצגת הדף.</p>
+  <p>לשאלות בנוגע לפרטיות: <a href="mailto:boost@boost-me.digital">boost@boost-me.digital</a></p>
+</dialog>
+
+<dialog class="modal" id="terms-modal" aria-labelledby="terms-title">
+  <button type="button" class="close" aria-label="סגירה">✕</button>
+  <h2 id="terms-title">תנאי שימוש</h2>
+  <p>האתר מוצג כפי שהוא, למטרות הסבר בלבד. התוכן הוא הסבר כללי ומפושט של מושגים בתחום ה-AI, ואינו ייעוץ מקצועי.</p>
+  <p>מותר ורצוי לשתף את הקישור לאתר. אין להעתיק, לשכפל, להפיץ או לעשות שימוש מסחרי בתוכן, בשרטוטים או בקוד של האתר, כולם או חלקם, בלי אישור מראש ובכתב מ-Boost Me. כל הזכויות באתר שמורות ל-Boost Me.</p>
+  <p>השימוש באתר הוא באחריות המשתמשים. קישורים חיצוניים (כגון וואטסאפ) כפופים לתנאי השימוש והפרטיות של הספק החיצוני. התוכן עשוי להתעדכן ללא הודעה מוקדמת.</p>
+</dialog>
+
+<script>
+  // Legal pop-ups, wired by name: #NAME-open opens dialog#NAME-modal. Native
+  // <dialog> gives the focus trap and Escape-to-close; a click on the backdrop
+  // closes too.
+  for (const modal of document.querySelectorAll('dialog.modal')) {
+    const opener = document.getElementById(modal.id.replace('-modal', '-open'));
+    opener.addEventListener('click', () => modal.showModal());
+    modal.querySelector('.close').addEventListener('click', () => modal.close());
+    modal.addEventListener('click', event => { if (event.target === modal) modal.close(); });
+  }
+</script>
 
 <script>
   const base = document.getElementById('base');
