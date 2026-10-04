@@ -320,7 +320,9 @@
   .wa{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:.6em 1.5em;
     background:var(--line);color:var(--bg);border-radius:999px;text-decoration:none;font-weight:700;
     font-size:1.05rem;transition:transform .15s ease, background-color .15s ease;}
-  .again{display:block;margin-top:.7em;padding:6px 2px;min-height:32px;appearance:none;background:none;border:0;
+  /* the two quiet links under the button share one line */
+  .more{display:flex;flex-wrap:wrap;gap:0 1.4em;margin-top:.7em;}
+  .again{display:inline-flex;align-items:center;padding:6px 2px;min-height:32px;appearance:none;background:none;border:0;
     font:inherit;font-weight:500;color:inherit;text-decoration:underline;text-underline-offset:4px;cursor:pointer;}
   .again:hover{color:var(--extra);}
   .again:focus-visible{outline:3px solid var(--extra);outline-offset:2px;}
@@ -923,7 +925,10 @@
         </ol>
         <p class="ask">לא בטוחים מה לארוז ל-AI שלכם? בואו נדבר.</p>
         <a class="wa" href="https://wa.me/972526328774" target="_blank" rel="noopener">דברו איתנו בוואטסאפ<span class="sr"> (נפתח בחלון חדש)</span></a>
-        <button type="button" class="again" id="again">להתחיל מהתחלה</button>
+        <div class="more">
+          <button type="button" class="again" id="again">להתחיל מהתחלה</button>
+          <a class="again" href="https://boost-me.digital/" target="_blank" rel="noopener">לאתר של BOOST ME<span class="sr"> (נפתח בחלון חדש)</span></a>
+        </div>
       </div>
     </div>
 
