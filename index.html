@@ -52,7 +52,7 @@
        when closed to make room for the pull handle */
     --shift:calc(-318 - (1 - var(--p)) * 27 + var(--stand) * 45);
     --world-left:50%;
-    --world-top:calc(60px + (345 + var(--stand) * 75) * var(--ubase));
+    --world-top:calc(60px + (345 + var(--stand) * 115) * var(--ubase));
     /* the camera rises as the case opens: low while closed so the volume
        reads, higher once open so both halves have room to be filled */
     --tilt:calc(52deg - var(--p) * 16deg + var(--stand) * 15deg);
@@ -333,7 +333,7 @@
     /* the caption hangs under the case, not off the bottom of the screen */
     .view{perspective-origin:50% calc(60px + 395 * var(--ubase));}
     .captions{top:calc(60px + 885 * var(--ubase));bottom:auto;min-height:0;}
-    .captions.ending{top:calc(60px + 465 * var(--ubase));}
+    .captions.ending{top:calc(60px + 505 * var(--ubase));}
     .cap.end h2{font-size:2.3rem;}
     .tips{margin-bottom:.9em;}
     .tips li{padding-top:.4em;padding-bottom:.4em;font-size:.95rem;line-height:1.45;}
@@ -835,14 +835,14 @@
              once the case stands. It lies in a plane just in front of the lid
              face; rotate(90) turns it upright for the standing view. -->
         <svg class="face tagup" style="--z:208" viewBox="-650 -20 800 440" aria-hidden="true">
-          <g transform="translate(40 300) rotate(90) scale(1.5)">
+          <g transform="translate(92 321) rotate(90) scale(1.5)">
             <g filter="url(#rough)">
             </g>
-            <g transform="rotate(-10)" filter="url(#rough)">
+            <g transform="rotate(24)" filter="url(#rough)">
               <path class="o p" d="M-52 -14L-36 -31H48Q52 -31 52 -27V27Q52 31 48 31H-36L-52 14Z"/>
               <circle class="m p" cx="-39" cy="0" r="5.5"/>
-              <!-- the strap: a closed loop through the hole and over the handle grip -->
-              <path class="m" d="M-42.5 1.5C-48 -30 -44 -80 -40 -112Q-34 -122 -28 -112C-34 -80 -40 -30 -35.5 1.5Q-39 6 -42.5 1.5Z"/>
+              <!-- the strap: one short ring through the hole and round the end of the handle grip -->
+              <ellipse class="m" cx="-45" cy="2.5" rx="10" ry="6" transform="rotate(-24 -45 2.5)"/>
               <g transform="translate(12 1) scale(.86)" stroke-width="2.4">
                 <circle cx="0" cy="-28.2" r="2.2"/>
                 <path d="M0 -26V-23.8"/>
