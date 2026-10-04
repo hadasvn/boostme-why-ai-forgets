@@ -1,6 +1,6 @@
 # למה AI שוכח? (Why does AI forget?)
 
-> A scroll-driven explainer by Boost Me. It explains three AI terms through one suitcase being packed for a week at the beaches of Seychelles: Context Window, Context Engineering and Compaction. Hebrew, for a non-technical audience.
+> A scroll-driven explainer by Boost Me. It explains three AI terms through one suitcase being packed for a week at the beaches of Seychelles: Context Window, Context Engineering and Compact. Hebrew, for a non-technical audience.
 
 URL: https://hadasvn.github.io/boostme-why-ai-forgets/
 
@@ -8,7 +8,7 @@ URL: https://hadasvn.github.io/boostme-why-ai-forgets/
 
 1. Context Window: an empty suitcase. It looks roomy, but its size is fixed. That is the amount of information an AI can hold in mind at once.
 2. Context Engineering: medicine, yes; five pairs of shoes and a coat for the beach, less so. Everything that goes in takes the place of something else. Context Engineering is choosing what goes in and what stays home.
-3. Compaction: it will not close, so the clothes and shoes go into one vacuum bag. Compaction shrinks what is already inside to make room. What is left is one lump: you know there are clothes in it, you no longer remember which.
+3. Compact: it will not close, so the clothes and shoes go into one vacuum bag. Compacting shrinks what is already inside to make room. What is left is one lump: you know there are clothes in it, you no longer remember which.
 4. The freed room fills up at once: a charger, a swimsuit, flip-flops, and a sixth pair of shoes.
 5. It closes. By force, but it closes.
 6. At the hotel it opens. The sunscreen is over everything, and the shirt you were looking for is lost inside the lump. That is how AI forgets: in a conversation that is too long, details get squashed and swallowed along the way.
