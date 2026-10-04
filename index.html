@@ -170,6 +170,12 @@
   /* its twin on the standing case appears once the case is upright */
   .tagup{opacity:0;pointer-events:none;transition:opacity .4s ease;}
   .stood .tagup{opacity:1;}
+  /* desktop: the hanging tag is a little smaller and swings slightly out of
+     the plane of the case, pivoting on its ring */
+  @media (min-width:900px) and (min-aspect-ratio:5/4){
+    .tagup{transform-origin:calc(var(--u) * 766) calc(var(--u) * 288);
+      transform:translateZ(calc(var(--u) * 228)) rotateY(-10deg) rotateX(7deg) scale(.78);}
+  }
 
   /* the leaked sunscreen: hidden until the case is opened at the destination,
      then it shows over everything in both halves */
