@@ -18,7 +18,7 @@ URL: https://hadasvn.github.io/boostme-why-ai-forgets/
 
 - New topic? Open a new conversation and start with an empty suitcase.
 - Give the AI only what the task needs. Leave the coat at home.
-- Long conversation? Repeat the important details before they get squashed.
+- Long conversation? Ask for a detailed summary of the important details and take it into a new conversation.
 
 ## Contact
 
